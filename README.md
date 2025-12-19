@@ -1,6 +1,6 @@
 # FD Macro Generator 🚀
 
-**FD Macro Generator** is a high-fidelity, premium support automation tool designed for Binance Futures support agents. It generates precise, data-backed macro responses for common user inquiries (Slippage, Stop Market triggers, Funding Rates) by pulling real-time 1m OHLC data directly from the Binance API.
+**FD Macro Generator** is a high-fidelity, premium support automation tool designed for Futures support agents. It generates precise, data-backed macro responses for common user inquiries (Slippage, Stop Market triggers, Funding Rates) by pulling real-time 1m OHLC data directly from the Exchange API.
 
 ---
 
@@ -10,7 +10,7 @@ The application is built with a **Stateless Macro Engine** architecture. UI comp
 
 ### Key Technologies
 - **Core**: React 18, Vite, TypeScript.
-- **Data Source**: Binance Futures Public API (`fapi`).
+- **Data Source**: Futures Public API (`fapi`).
 - **Styling**: Vanilla CSS with a **Premium Dark Mode** design system (glassmorphism, vibrant gradients).
 - **Deployment**: Automated GitHub Pages via GitHub Actions.
 
@@ -38,7 +38,7 @@ The application is built with a **Stateless Macro Engine** architecture. UI comp
 |:--- |:--- |:--- |
 | `src/main.tsx` | Entry point. Mounts the React tree. | `App.tsx`, `AppContext.tsx` |
 | `src/App.tsx` | Main Layout. Manages navigation (Tabs) and global Language state. | `MacroGenerator.tsx`, `FundingMacro.tsx`, `PriceLookup.tsx` |
-| `src/pricing.ts` | Centralized data fetching. Handles Binance 1m OHLC and Precision data. | `Binance FAPI` |
+| `src/pricing.ts` | Centralized data fetching. Handles Exchange 1m OHLC and Precision data. | `Futures FAPI` |
 | `src/components/MacroGenerator.tsx` | The primary interface for generating trade-related macros (TP/SL/Slippage). | `renderMacro`, `pricing.ts` |
 | `src/components/FundingMacro.tsx` | Dedicated UI for complex funding rate calculation macros. | `pricing.ts`, `helpers.ts` |
 | `src/components/LiveTicker.tsx` | Real-time header ticker for key symbols (BTC, ETH, etc.). | `pricing.ts` |
