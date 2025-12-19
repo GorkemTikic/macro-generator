@@ -1,0 +1,555 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #111827;
+  --muted: #9aa4b2;
+  --text: #e5e7eb;
+  --accent: #00e5a8;
+  --accent-2: #3b82f6;
+  --danger: #ef4444;
+  --card: #0f172a;
+  --input: #0b1220;
+  --ring: rgba(0, 229, 168, 0.35);
+  --mark: #3b82f6;
+  /* mavi */
+  --last: #a855f7;
+  /* mor */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background: radial-gradient(1200px 700px at 80% -10%, rgba(0, 229, 168, .12), transparent 60%),
+    radial-gradient(800px 400px at 0% 20%, rgba(59, 130, 246, .18), transparent 55%),
+    var(--bg);
+  color: var(--text);
+}
+
+.container {
+  max-width: 1200px;
+  margin: 28px auto;
+  padding: 0 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 28px;
+  letter-spacing: 0.2px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #00100b;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.panel {
+  background: linear-gradient(180deg, rgba(17, 24, 39, .88), rgba(15, 23, 42, .88));
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(2, 6, 23, .5), inset 0 1px 0 rgba(255, 255, 255, .04);
+  animation: fadeIn 0.3s ease;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 14px;
+}
+
+.col-6 {
+  grid-column: span 6;
+}
+
+.col-12 {
+  grid-column: span 12;
+}
+
+@media (max-width: 900px) {
+
+  .col-6,
+  .col-12 {
+    grid-column: span 12;
+  }
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.input,
+.select,
+.btn,
+.textarea {
+  width: 100%;
+  background: var(--input);
+  border: 1px solid rgba(255, 255, 255, .06);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 12px 12px;
+  outline: none;
+  transition: box-shadow .15s ease, border-color .15s ease, transform .03s ease;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  box-shadow: 0 0 0 4px var(--ring);
+  border-color: var(--accent);
+}
+
+.textarea {
+  min-height: 220px;
+  resize: vertical;
+}
+
+.btn {
+  cursor: pointer;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #031015;
+  font-weight: 800;
+  letter-spacing: .3px;
+  border: none;
+  border-radius: 10px;
+  transition: transform .1s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn.secondary {
+  background: #151c2c;
+  color: var(--text);
+  border: 1px solid rgba(255, 255, 255, .08);
+}
+
+.btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+.helper {
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.hr {
+  height: 1px;
+  margin: 18px 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .12), transparent);
+}
+
+.kbd {
+  display: inline-block;
+  background: #0a1220;
+  border: 1px solid rgba(255, 255, 255, .1);
+  color: #cbd5e1;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+/* ==== Tabs ==== */
+.tabs {
+  display: flex;
+  gap: 10px;
+}
+
+.tab {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: var(--muted);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tab:hover {
+  background: #273449;
+  color: #fff;
+}
+
+.tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  border-color: var(--accent-2);
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.4);
+}
+
+/* ==== Dil Seçici ==== */
+.lang-switcher {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.lang-btn {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lang-btn:hover {
+  background: #334155;
+  color: #fff;
+}
+
+.lang-btn.active {
+  background: var(--accent-2);
+  color: #fff;
+  border-color: var(--accent-2);
+}
+
+
+/* ==== Price Highlight Cards ==== */
+.price-box {
+  background: #0f172a;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05);
+}
+
+.price-box h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.price-box.mark {
+  border-left: 4px solid var(--mark);
+}
+
+.price-box.last {
+  border-left: 4px solid var(--last);
+}
+
+/* ==== Animations ==== */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ✅ GÜNCELLENDİ: Grid Ayrıştırma Modalı Stilleri */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 20, 30, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 16px;
+  padding: 24px;
+  width: 100%;
+  max-width: 1000px;
+  /* Genişletildi */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+  position: relative;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-close-btn {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 28px;
+  font-weight: 300;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.modal-close-btn:hover {
+  color: var(--text);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+
+.modal-content .helper {
+  margin-bottom: 12px;
+  margin-top: 0;
+}
+
+.modal-content .textarea {
+  min-height: 300px;
+  /* Yükseltildi */
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  resize: none;
+}
+
+/* ✅ YENİ: Modal için 2 sütunlu grid */
+.modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  overflow-y: hidden;
+}
+
+.modal-grid-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  /* flexbox taşma sorunu için */
+}
+
+/* ✅ YENİ: Önizleme Tablosu Stilleri */
+.modal-preview-grid {
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 12px;
+  background: var(--input);
+  overflow-y: auto;
+  max-height: 312px;
+  /* textarea ile aynı yükseklik */
+}
+
+.modal-preview-grid .label {
+  padding: 10px 12px 6px 12px;
+  position: sticky;
+  top: 0;
+  background: var(--input);
+  z-index: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.modal-preview-grid table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.modal-preview-grid th {
+  text-align: left;
+  padding: 8px 12px;
+  color: var(--muted);
+  background: rgba(0, 0, 0, .1);
+  font-weight: 600;
+}
+
+.modal-preview-grid td {
+  padding: 6px 12px;
+  border-top: 1px solid rgba(255, 255, 255, .05);
+  font-family: 'Courier New', Courier, monospace;
+}
+
+/* Ticker Styles: Cyberpunk Premium (V2 - Compact) */
+.ticker-badge {
+  /* Glassmorphism Dark */
+  background: rgba(10, 10, 15, 0.85);
+  backdrop-filter: blur(10px);
+
+  /* Neon Border */
+  border: 1px solid rgba(0, 255, 242, 0.3);
+  border-radius: 6px;
+  /* Slightly smoother */
+
+  /* Spacing & Layout */
+  padding: 5px 12px;
+  /* Matching .tab height approx */
+  margin-left: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  /* Typography */
+  font-family: 'Orbitron', 'Courier New', monospace;
+  font-size: 13px;
+  /* Precise sizing */
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  /* Tighter */
+  color: #8faec4;
+
+  /* Glow Effect */
+  box-shadow: 0 0 10px rgba(0, 255, 242, 0.1), inset 0 0 20px rgba(0, 255, 242, 0.02);
+  transition: all 0.3s ease;
+  height: 32px;
+  /* Force height match */
+}
+
+.ticker-price {
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+  padding-top: 2px;
+  /* Optical adjustment for Orbitron */
+}
+
+/* Green (Up) */
+.ticker-up {
+  border-color: rgba(57, 255, 20, 0.5);
+  box-shadow: 0 0 12px rgba(57, 255, 20, 0.2);
+}
+
+.ticker-up .ticker-price {
+  color: #39ff14;
+  text-shadow: 0 0 8px rgba(57, 255, 20, 0.6);
+}
+
+/* Red (Down) */
+.ticker-down {
+  border-color: rgba(255, 0, 60, 0.5);
+  box-shadow: 0 0 12px rgba(255, 0, 60, 0.2);
+}
+
+.ticker-down .ticker-price {
+  color: #ff003c;
+  text-shadow: 0 0 8px rgba(255, 0, 60, 0.6);
+}
+
+.modal-preview-grid tr:hover {
+  background: rgba(255, 255, 255, .03);
+}
+
+/* Anahtar satırları vurgula */
+.modal-preview-grid tr.highlight td:first-child {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.modal-preview-grid tr.highlight td:last-child {
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ==== Internal Tabs (Price Lookup) ==== */
+.lookup-tabs {
+  display: flex;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px;
+  border-radius: 10px;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+
+.lookup-tab {
+  flex: 1;
+  text-align: center;
+  padding: 8px;
+  cursor: pointer;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: all 0.2s ease;
+}
+
+.lookup-tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #031015;
+  box-shadow: 0 0 12px rgba(0, 229, 168, 0.4);
+  font-weight: 800;
+}
+
+.lookup-tab:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+
+/* ==== Option Cards (Mode Selection) ==== */
+.option-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.option-card {
+  background: var(--input);
+  border: 1px solid rgba(255, 255, 255, .06);
+  border-radius: 10px;
+  padding: 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 60px;
+}
+
+.option-card span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.option-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.option-card.active {
+  border-color: var(--accent);
+  background: rgba(0, 229, 168, 0.05);
+}
+
+.option-card.active span {
+  color: var(--accent);
+}
