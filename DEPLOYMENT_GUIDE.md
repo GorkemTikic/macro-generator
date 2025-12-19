@@ -4,10 +4,14 @@ Follow these steps to publish your app to GitHub and keep it updated.
 
 ## 1. Initial Publish to GitHub
 
-1.  **Create Repository**: Go to [GitHub](https://github.com/new) and create a new repository named `macro-generator`. Keep it **Public** and do **NOT** initialize it with a README, license, or .gitignore (since we already have them).
-2.  **Link Local to GitHub**: Run the following commands in your terminal:
+1.  **Create Repository**: Go to [GitHub](https://github.com/GorkemTikic/macro-generator) (already created).
+2.  **Enable GitHub Pages from Actions**:
+    - Go to your repository **Settings** -> **Pages**.
+    - For **Build and deployment** > **Source**, change from "Deploy from a branch" to **"GitHub Actions"**.
+    - *(This is required for the automated workflow to work!)*
+3.  **Link Local to GitHub**: Run the following commands in your terminal:
     ```bash
-    git remote add origin https://github.com/YOUR_GITHUB_USERNAME/macro-generator.git
+    git remote add origin https://github.com/GorkemTikic/macro-generator.git
     git branch -M main
     git push -u origin main
     ```
