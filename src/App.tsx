@@ -19,7 +19,7 @@ export default function App() {
     <div className="container">
       <div className="header">
         <div className="brand" style={{ display: 'flex', alignItems: 'center' }}>
-          Order Macro App <span className="badge">{t.badge}</span>
+          FD Macro Generator <span className="badge">{t.badge}</span>
           <LiveTicker />
         </div>
         <div className="tabs">
