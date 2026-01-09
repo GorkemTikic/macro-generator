@@ -1,23 +1,23 @@
 // src/components/PriceLookup.jsx
 import React, { useState } from "react";
 import {
-  // ✅ DÜZELTME: Import yolu düzeltildi (../)
   getTriggerMinuteCandles,
   getRangeHighLow,
   getLastPriceAtSecond,
+  findPriceOccurrences, // ✅ Added
 } from "../pricing";
 
 import { useApp } from "../context/AppContext";
 
-// ✅ GÜNCELLENDİ: Propları alır
 export default function PriceLookup({ lang, uiStrings }) {
   const { activeSymbol, setActiveSymbol } = useApp();
-  // const [symbol, setSymbol] = useState("ETHUSDT"); // Removed local state
   const [market, setMarket] = useState("futures"); // "futures" | "spot"
-  const [mode, setMode] = useState("trigger");
+  const [mode, setMode] = useState("trigger"); // "trigger" | "range" | "last1s" | "findPrice"
+  const [priceType, setPriceType] = useState("last"); // "last" | "mark"
   const [at, setAt] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [targetPrice, setTargetPrice] = useState(""); // ✅ New Input
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
 
@@ -29,6 +29,7 @@ export default function PriceLookup({ lang, uiStrings }) {
     const errNoData = lang === 'tr' ? 'Veri bulunamadı.' : 'No data found.';
     const errTime = lang === 'tr' ? 'Lütfen bir "Tetiklenme Zamanı" girin.' : 'Please enter a Triggered At timestamp.';
     const errRange = lang === 'tr' ? 'Lütfen Başlangıç ve Bitiş zamanlarını girin.' : 'Please enter both From and To.';
+    const errPrice = lang === 'tr' ? 'Lütfen bir hedef Fiyat girin.' : 'Please enter a target Price.';
     const errLast1s = lang === 'tr' ? 'Lütfen bir Tarih/Zaman (UTC) girin.' : 'Please enter a DateTime (UTC).';
     const errLast1sData = lang === 'tr' ? 'O saniye için işlem verisi bulunamadı (Last Price).' : 'No trade data found for that second (Last Price).';
 
@@ -41,14 +42,14 @@ export default function PriceLookup({ lang, uiStrings }) {
 
         let msg = `${at} UTC+0 (${market.toUpperCase()}) = ` + (lang === 'tr' ? `Bu tarih ve saatte:` : `At this date and time:`) + `\n\n`;
 
-        // Mark Price (Sadece Futures)
+        // Mark Price (Futures Only)
         if (market === "futures") {
           msg += `**Mark Price:**\n` + (lang === 'tr' ? `Açılış` : `Opening`) + `: ${mark?.open ?? "N/A"}\n` + (lang === 'tr' ? `Yüksek` : `Highest`) + `: ${mark?.high ?? "N/A"}\n` + (lang === 'tr' ? `Düşük` : `Lowest`) + `: ${mark?.low ?? "N/A"}\n` + (lang === 'tr' ? `Kapanış` : `Closing`) + `: ${mark?.close ?? "N/A"}\n\n`;
         } else {
           msg += `**Mark Price:** N/A (Spot Market)\n\n`;
         }
 
-        // Last Price (Her ikisi)
+        // Last Price (Both)
         msg += `**Last Price:**\n` + (lang === 'tr' ? `Açılış` : `Opening`) + `: ${last?.open ?? "N/A"}\n` + (lang === 'tr' ? `Yüksek` : `Highest`) + `: ${last?.high ?? "N/A"}\n` + (lang === 'tr' ? `Düşük` : `Lowest`) + `: ${last?.low ?? "N/A"}\n` + (lang === 'tr' ? `Kapanış` : `Closing`) + `: ${last?.close ?? "N/A"}`;
 
         setResult(msg);
@@ -89,7 +90,39 @@ export default function PriceLookup({ lang, uiStrings }) {
           `**` + (lang === 'tr' ? `Açılış` : `Opening`) + `:** ${ohlc.open}\n` + (lang === 'tr' ? `Yüksek` : `Highest`) + `: ${ohlc.high}\n` + (lang === 'tr' ? `Düşük` : `Lowest`) + `: ${ohlc.low}\n` + (lang === 'tr' ? `Kapanış` : `Closing`) + `: ${ohlc.close}\n` +
           (lang === 'tr' ? `(o saniyedeki ${ohlc.count} işleme göre)` : `(based on ${ohlc.count} trades in that second)`);
         setResult(msg);
+
+      } else if (mode === "findPrice") {
+        if (!from || !to) return setError(errRange);
+        if (!targetPrice) return setError(errPrice);
+
+        const finalType = (market === 'futures') ? priceType : 'last';
+        const data = await findPriceOccurrences(activeSymbol, from, to, parseFloat(targetPrice), market, finalType);
+        if (!data || !data.first) return setResult(errNoData);
+
+        const typeLabel = finalType === 'mark' ? 'Mark Price' : 'Last Price';
+        let msg = (lang === 'tr' ? `${activeSymbol} (${market.toUpperCase()} - ${typeLabel}) paritesinde, ${targetPrice} fiyatına:` : `On ${activeSymbol} (${market.toUpperCase()} - ${typeLabel}), the price ${targetPrice}:`) + `\n\n`;
+
+        msg += (lang === 'tr' ? `✅ İLK ULAŞILAN ZAMAN:` : `✅ FIRST REACHED AT:`) + `\n` +
+          `${data.first.fmt} UTC+0` + `\n` +
+          (data.first.isExact ? (lang === 'tr' ? `(İşlem Takas Verisi doğrulandı)` : `(Verified via AggTrades)`) : (lang === 'tr' ? `(Dakikalık mum hassasiyeti)` : `(1m Candle precision)`)) + `\n\n`;
+
+        if (data.others.length > 0) {
+          msg += (lang === 'tr' ? `🔁 SONRAKİ EŞLEŞMELER (Yaklaşık Dakikalar):` : `🔁 SUBSEQUENT MATCHES (Approx Minutes):`) + `\n`;
+          // Show first 10 matches only to avoid spam
+          const limit = 10;
+          data.others.slice(0, limit).forEach(t => {
+            msg += `- ${t} UTC+0\n`;
+          });
+          if (data.others.length > limit) {
+            msg += (lang === 'tr' ? `... ve ${data.others.length - limit} kez daha.` : `... and ${data.others.length - limit} more times.`);
+          }
+        } else {
+          msg += (lang === 'tr' ? `Bu aralıkta başka eşleşme yok.` : `No other matches in this range.`);
+        }
+
+        setResult(msg);
       }
+
     } catch (err) {
       setError(err.message);
     }
@@ -117,18 +150,24 @@ export default function PriceLookup({ lang, uiStrings }) {
 
       {/* Mode Selection Cards */}
       <label className="label">{t.lookupMode}</label>
-      <div className="option-cards">
+      <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
         <div
           className={`option-card ${mode === 'trigger' ? 'active' : ''}`}
           onClick={() => setMode('trigger')}
         >
-          <span>Trigger Minute</span>
+          <span>Trigger</span>
         </div>
         <div
           className={`option-card ${mode === 'range' ? 'active' : ''}`}
           onClick={() => setMode('range')}
         >
           <span>Range</span>
+        </div>
+        <div
+          className={`option-card ${mode === 'findPrice' ? 'active' : ''}`}
+          onClick={() => setMode('findPrice')}
+        >
+          <span>Find 🔍</span>
         </div>
         <div
           className={`option-card ${mode === 'last1s' ? 'active' : ''}`}
@@ -167,7 +206,7 @@ export default function PriceLookup({ lang, uiStrings }) {
           </div>
         )}
 
-        {mode === "range" && (
+        {(mode === "range" || mode === "findPrice") && (
           <>
             <div className="col-6">
               <label className="label">{t.lookupFrom}</label>
@@ -187,6 +226,46 @@ export default function PriceLookup({ lang, uiStrings }) {
                 onChange={(e) => setTo(e.target.value)}
               />
             </div>
+          </>
+        )}
+
+        {mode === "findPrice" && (
+          <>
+            <div className="col-12">
+              <label className="label">{lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}</label>
+              <input
+                className="input"
+                type="number"
+                placeholder="Price (e.g. 95000)"
+                value={targetPrice}
+                onChange={(e) => setTargetPrice(e.target.value)}
+              />
+            </div>
+
+            {market === "futures" && (
+              <div className="col-12" style={{ marginTop: -8 }}>
+                <div style={{ display: 'flex', gap: 15 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, color: '#ccc' }}>
+                    <input
+                      type="radio"
+                      name="ptype"
+                      checked={priceType === 'last'}
+                      onChange={() => setPriceType('last')}
+                    />
+                    <span style={{ marginLeft: 6 }}>Last Price (Exact)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, color: '#ccc' }}>
+                    <input
+                      type="radio"
+                      name="ptype"
+                      checked={priceType === 'mark'}
+                      onChange={() => setPriceType('mark')}
+                    />
+                    <span style={{ marginLeft: 6 }}>Mark Price (1m Approx)</span>
+                  </label>
+                </div>
+              </div>
+            )}
           </>
         )}
 
@@ -223,3 +302,4 @@ export default function PriceLookup({ lang, uiStrings }) {
     </div>
   );
 }
+

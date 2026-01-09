@@ -32,46 +32,40 @@ function fmtUTC(ms) {
 }
 
 /**
- * İç kullanım: Büyük tarih aralıklarında 1m mumları sayfalı (paginated) çeker.
- * Binance API 1 istekte en fazla ~1500 kline döndürür (≈ 25 saat @1m).
- * Bu yüzden aralığı parçalayarak tüm veriyi topluyoruz.
+ * İç kullanım: Büyük tarih aralıklarında kline'ları sayfalı (paginated) çeker.
+ * Binance API 1 istekte en fazla ~1500 kline döndürür.
  *
  * @param {"mark"|"last"} kind
  * @param {string} symbol
  * @param {number} startMs UTC ms
- * @param {number} endMs UTC ms (exclusive önerilir)
- * @param {"futures"|"spot"} market (default "futures")
- * @returns {Promise<Array>} Kline dizisi (ham API formatı)
+ * @param {number} endMs UTC ms
+ * @param {"futures"|"spot"} market
+ * @param {string} interval "1m", "1h", "1d" vb.
  */
-async function fetchAll1mKlines(kind, symbol, startMs, endMs, market = "futures") {
-  const MAX_LIMIT = 1500; // güvenli üst sınır
+async function fetchAllKlines(kind, symbol, startMs, endMs, market = "futures", interval = "1m") {
+  const MAX_LIMIT = 1500;
   let cur = startMs;
   const out = [];
   let guard = 0;
 
-  while (cur < endMs && guard++ < 10000) {
+  // Interval duration in ms (approx for large intervals)
+  let stepMs = 60_000;
+  if (interval === "1h") stepMs = 3600_000;
+  if (interval === "1d") stepMs = 86400_000;
+
+  while (cur < endMs && guard++ < 1000) {
     let base = "";
-    // FUTURES
     if (market === "futures") {
-      base =
-        kind === "mark"
-          ? "https://fapi.binance.com/fapi/v1/markPriceKlines"
-          : "https://fapi.binance.com/fapi/v1/klines";
-    }
-    // SPOT
-    else {
-      // Spotta Mark Price yok, sadece Last (klines) var.
-      // Eğer yanlışlıkla mark istenirse boş dön (veya klines'a yönlendirme yapılabilir ama UI ayırıyor).
+      base = kind === "mark" ? "https://fapi.binance.com/fapi/v1/markPriceKlines" : "https://fapi.binance.com/fapi/v1/klines";
+    } else {
       if (kind === "mark") return [];
       base = "https://api.binance.com/api/v3/klines";
     }
 
-    const url =
-      `${PROXY}${base}?symbol=${encodeURIComponent(symbol)}` +
-      `&interval=1m&startTime=${cur}&endTime=${endMs}&limit=${MAX_LIMIT}`;
+    const url = `${PROXY}${base}?symbol=${encodeURIComponent(symbol)}&interval=${interval}&startTime=${cur}&endTime=${endMs}&limit=${MAX_LIMIT}`;
 
     const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch ${kind} price data (${market})`);
+    if (!res.ok) throw new Error(`Failed to fetch ${kind} price data (${market}) at ${interval}`);
     const chunk = await res.json();
 
     if (!Array.isArray(chunk) || !chunk.length) break;
@@ -79,7 +73,7 @@ async function fetchAll1mKlines(kind, symbol, startMs, endMs, market = "futures"
     out.push(...chunk);
 
     const lastOpen = Number(chunk[chunk.length - 1][0]);
-    const next = lastOpen + 60_000;
+    const next = lastOpen + stepMs;
     if (next <= cur) break;
     cur = next;
   }
@@ -154,7 +148,7 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
 
   // Spotta sadece Last (klines) verisi var.
   if (market === "spot") {
-    const lastCandles = await fetchAll1mKlines("last", symbol, start, end, "spot");
+    const lastCandles = await fetchAllKlines("last", symbol, start, end, "spot", "1m");
 
     let lastHigh, lastLow, lastHighTime, lastLowTime;
     const isNum = (v) => typeof v === "number" && !isNaN(v);
@@ -187,8 +181,8 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
 
   // FUTURES
   const [markCandles, lastCandles] = await Promise.all([
-    fetchAll1mKlines("mark", symbol, start, end, "futures"),
-    fetchAll1mKlines("last", symbol, start, end, "futures"),
+    fetchAllKlines("mark", symbol, start, end, "futures", "1m"),
+    fetchAllKlines("last", symbol, start, end, "futures", "1m"),
   ]);
 
   if (!markCandles.length && !lastCandles.length) {
@@ -354,3 +348,168 @@ export async function getAllSymbolPrecisions() {
   symbolPrecisionCache = map;
   return map;
 }
+
+export async function findPriceOccurrences(symbol, fromStr, toStr, targetPrice, market = "futures", priceType = "last") {
+  const startMs = Date.parse(fromStr + "Z");
+  const endMs = Date.parse(toStr + "Z");
+  if (isNaN(startMs) || isNaN(endMs)) throw new Error("Invalid date format.");
+
+  let fetchKind = "last";
+  if (market === "futures" && priceType === "mark") fetchKind = "mark";
+
+  // --- Hierarchical Search Optimized ---
+  const isLargeRange = (endMs - startMs) > 172800_000; // > 2 Days
+  let candles = [];
+
+  if (isLargeRange) {
+    // Phase 1: Scan Daily Candles (Fast, 1 request per 1500 days)
+    const dayCandles = await fetchAllKlines(fetchKind, symbol, startMs, endMs, market, "1d");
+    const matchingDays = dayCandles.filter(c => targetPrice >= parseFloat(c[3]) && targetPrice <= parseFloat(c[2]));
+
+    // Phase 2: Fetch 1m Candles for matching days ONLY
+    // Limit to prevent accidental spam if price stayed at target for months
+    const maxDaysToScan = 30;
+    let daysScanned = 0;
+
+    for (const day of matchingDays) {
+      const dStart = Number(day[0]);
+      const dEnd = dStart + 86400_000;
+
+      // Ensure we don't scan outside requested range
+      const scanStart = Math.max(dStart, startMs);
+      const scanEnd = Math.min(dEnd, endMs);
+
+      const dayMinuteCandles = await fetchAllKlines(fetchKind, symbol, scanStart, scanEnd, market, "1m");
+      candles.push(...dayMinuteCandles.filter(c => targetPrice >= parseFloat(c[3]) && targetPrice <= parseFloat(c[2])));
+
+      daysScanned++;
+      if (daysScanned >= maxDaysToScan) break;
+      if (candles.length > 500) break; // Common sense limit
+    }
+  } else {
+    // Small range: Fetch 1m directly
+    const directCandles = await fetchAllKlines(fetchKind, symbol, startMs, endMs, market, "1m");
+    candles = directCandles.filter(c => targetPrice >= parseFloat(c[3]) && targetPrice <= parseFloat(c[2]));
+  }
+
+  if (!candles.length) return null;
+
+  // 3. Precision Lookup (AggTrades for Last Price only)
+  // We identify the absolute first occurrence across all scanned intervals
+  const firstMatch = candles[0];
+  let exactTime = null;
+
+  if (fetchKind === "last") {
+    exactTime = await findMatchInAggTrades(symbol, Number(firstMatch[0]), targetPrice, market);
+  }
+
+  const result = {
+    first: {
+      timestamp: exactTime ? exactTime.ts : Number(firstMatch[0]),
+      fmt: exactTime ? fmtUTC(exactTime.ts) : fmtUTC(Number(firstMatch[0])) + (priceType === 'mark' ? "" : " (approx minute)"),
+      price: exactTime ? exactTime.price : targetPrice,
+      isExact: !!exactTime
+    },
+    others: candles.slice(1, 21).map(c => fmtUTC(Number(c[0])).slice(0, 16)) // Limit to top 20
+  };
+
+  return result;
+}
+
+/**
+ * 🔍 Helper: Download aggTrades for a minute and find the FIRST trade that crossed/touched the price
+ */
+async function findMatchInAggTrades(symbol, minuteMs, target, market) {
+  // We need to fetch trades. AggTrades limit is 1000. 
+  // A busy minute might have > 1000 trades. We might need to page, but usually 1000 covers start of minute.
+  // Actually, for High Volatility, 1000 trades might cover only 5 seconds.
+  // We'll try to fetch a few pages if needed, up to 1 minute.
+
+  let fromId = null;
+  let startTime = minuteMs;
+  const endTime = minuteMs + 60_000;
+
+  // Safety break
+  let pages = 0;
+  while (startTime < endTime && pages < 10) {
+    let url = "";
+    if (market === "futures") {
+      url = `${PROXY}https://fapi.binance.com/fapi/v1/aggTrades?symbol=${symbol}&startTime=${startTime}&endTime=${endTime}&limit=1000`;
+    } else {
+      url = `${PROXY}https://api.binance.com/api/v3/aggTrades?symbol=${symbol}&startTime=${startTime}&endTime=${endTime}&limit=1000`;
+    }
+
+    const res = await fetch(url);
+    if (!res.ok) break;
+    const trades = await res.json();
+
+    if (!trades.length) break;
+
+    // Sort by time just in case
+    // trades.sort((a, b) => a.T - b.T); // API usually returns sorted
+
+    // Find cross
+    // We don't verify "previous price" perfect cross because we jumped into a stream.
+    // We just check if any trade hits the price. 
+    // Ideally check if (prev < target <= curr) or (prev > target >= curr).
+    // But exact match or range inclusion is good enough.
+
+    for (const t of trades) {
+      const p = parseFloat(t.p);
+      // Simplify: if matches strictly? Hard with floats.
+      // Let's assume user wants "when did it cross".
+      // But we need state. Let's strictly check deviation or just basic "== approx".
+      // Users enter specific numbers usually. 
+      // Let's check a small epsilon or if we have history.
+      // BETTER: Check if this trade makes the price "cross" the target from previous trade?
+      // Since we don't have "previous" of the minute start easily (without prev candle close), 
+      // let's just return the first trade that is "close enough" or exactly matches if simple.
+      // Actually, simplest definition: First trade where (Low <= Target <= High) of the trade? 
+      // AggTrade has only 'p' (price).
+      // So we just iterate.
+
+      // We need to know the trend. 
+      // Let's just return the first trade price that is extremely close (0.01%?) or 
+      // if we see a flip from below to above.
+
+      // Let's use < 0.000001 diff
+      if (Math.abs(p - target) < (target * 0.000001)) {
+        return { ts: t.T, price: p };
+      }
+
+      // Detect Crossing?
+      // We need 'prevP'.
+    }
+
+    // If not found exact, maybe it crossed between two trades?
+    // Let's do a second pass with logic:
+    // If trade[i] < target and trade[i+1] > target, then it happened between i and i+1.
+    // We return trade[i+1] as the moment it covered it.
+    for (let i = 0; i < trades.length - 1; i++) {
+      const p1 = parseFloat(trades[i].p);
+      const p2 = parseFloat(trades[i + 1].p);
+      if ((p1 < target && p2 >= target) || (p1 > target && p2 <= target)) {
+        return { ts: trades[i + 1].T, price: parseFloat(trades[i + 1].p) };
+      }
+    }
+
+    // Check first trade against Start of Minute Open?
+    // This is getting complex.
+    // Fallback: If we found NO cross in trades, but candle said Low <= Target <= High,
+    // then it must be that the *candle* data is reliable and maybe we missed a trade or 
+    // the High/Low happened in a trade we didn't fetch (unlikely if we fetch all).
+    // Or maybe the first trade IS the match (Gap).
+
+    // Let's just return the first trade of the minute if candle says yes?
+    // No, that's inaccurate.
+
+    // Update cursors
+    const lastT = trades[trades.length - 1].T;
+    if (lastT >= endTime - 1) break;
+    startTime = lastT + 1;
+    pages++;
+  }
+
+  return null; // Fallback to Minute resolution
+}
+
