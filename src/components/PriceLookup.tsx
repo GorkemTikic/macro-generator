@@ -211,7 +211,9 @@ export default function PriceLookup({ lang, uiStrings }) {
             `📝 **${t.trailingReboundFormula}**\n` +
             `> • ${t.trailingMaxDevLabel}: **${rbRate.toFixed(2)}%**\n` +
             `> • ${lang === 'tr' ? 'Hedef' : 'Target'}: **${cbRate}%** \n` +
-            `> *(${direction === 'short' ? lang === 'tr' ? '(Zirve - En Düşük) / Zirve' : '(Peak - Bottom) / Peak' : lang === 'tr' ? '(En Yüksek - Dip) / Dip' : '(Rebound - Trough) / Trough'} = ${rbRate.toFixed(2)}%)*`;
+            `> *(${direction === 'short' ? lang === 'tr' ? '(Zirve - En Düşük) / Zirve' : '(Peak - Bottom) / Peak' : lang === 'tr' ? '(En Yüksek - Dip) / Dip' : '(Rebound - Trough) / Trough'} = ${rbRate.toFixed(2)}%)*\n\n` +
+            `**${t.trailingAgentInternalTitle}:**\n` +
+            `> *${direction === 'short' ? t.trailingAgentInternalDescShort : t.trailingAgentInternalDescLong}*`;
 
         } else {
           msg += `### ❌ ${t.trailingResultNotActivated}\n` +

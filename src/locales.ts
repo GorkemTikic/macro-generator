@@ -79,6 +79,9 @@ export const uiStrings = {
     trailingPresentNote: "Sets to 1 minute ago (UTC+0)",
     trailingNextTriggerTip: "Next Trigger Level",
     trailingAgentSummary: "💡 Summary for Customer",
+    trailingAgentInternalTitle: "🛠 Internal Note for Agent",
+    trailingAgentInternalDescLong: "In a LONG (Buy) Trailing Stop, we track the lowest point (Trough). The trigger occurs when the price rebounds UP from that trough by the callback rate.",
+    trailingAgentInternalDescShort: "In a SHORT (Sell) Trailing Stop, we track the highest point (Peak). The trigger occurs when the price drops DOWN from that peak by the callback rate.",
   },
   tr: {
     badge: "Binance 1m OHLC",
@@ -160,5 +163,8 @@ export const uiStrings = {
     trailingPresentNote: "1 dakika öncesine ayarlar (UTC+0)",
     trailingNextTriggerTip: "Sıradaki Tetikleme Seviyesi",
     trailingAgentSummary: "💡 Müşteri İçin Özet",
+    trailingAgentInternalTitle: "🛠 Agent İçin İç Not",
+    trailingAgentInternalDescLong: "LONG (Alış) Trailing Stop'ta en düşük seviyeyi (Dip) takip ederiz. Tetiklenme, fiyatın bu dipten seçilen oran kadar YUKARI fırlamasıyla gerçekleşir.",
+    trailingAgentInternalDescShort: "SHORT (Satış) Trailing Stop'ta en yüksek seviyeyi (Zirve) takip ederiz. Tetiklenme, fiyatın bu zirveden seçilen oran kadar AŞAĞI düşmesiyle gerçekleşir.",
   }
 };
