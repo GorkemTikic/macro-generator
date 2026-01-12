@@ -45,7 +45,13 @@ export const uiStrings = {
     pasteButtonLabel: "📋 Paste Grid Data",
     pasteGridTitle: "Title (Fixed)",
     pasteGridValue: "Value (Pasted)",
-    pasteGridPreview: "Data Mapping Preview"
+    pasteGridPreview: "Data Mapping Preview",
+    // Detailed Lookup Messages
+    lookupNotFound: "Data not found.",
+    lookupPriceNotReached: "The target price of {price} was NOT reached within this period.",
+    lookupFoundTitle: "🎯 SUCCESS: TARGET REACHED",
+    lookupNotFoundTitle: "❌ NOT REACHED",
+    lookupNoTradeData: "No trade data found for that second (Last Price)."
   },
   tr: {
     badge: "Binance 1m OHLC",
@@ -93,6 +99,12 @@ export const uiStrings = {
     pasteButtonLabel: "📋 Emir Verisini Yapıştır",
     pasteGridTitle: "Başlık (Sabit)",
     pasteGridValue: "Değer (Yapıştırılan)",
-    pasteGridPreview: "Veri Eşleştirme Önizlemesi"
+    pasteGridPreview: "Veri Eşleştirme Önizlemesi",
+    // Detailed Lookup Messages
+    lookupNotFound: "Veri bulunamadı.",
+    lookupPriceNotReached: "{price} hedef fiyatına bu zaman aralığında ULAŞILMAMIŞTIR.",
+    lookupFoundTitle: "🎯 BAŞARILI: HEDEFE ULAŞILDI",
+    lookupNotFoundTitle: "❌ ULAŞILAMADI",
+    lookupNoTradeData: "O saniye için işlem verisi bulunamadı (Last Price)."
   }
 };

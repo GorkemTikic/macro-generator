@@ -26,69 +26,75 @@ export default function PriceLookup({ lang, uiStrings }) {
   async function handleLookup() {
     setResult("");
     setError("");
-    const errNoData = lang === 'tr' ? 'Veri bulunamadı.' : 'No data found.';
     const errTime = lang === 'tr' ? 'Lütfen bir "Tetiklenme Zamanı" girin.' : 'Please enter a Triggered At timestamp.';
     const errRange = lang === 'tr' ? 'Lütfen Başlangıç ve Bitiş zamanlarını girin.' : 'Please enter both From and To.';
     const errPrice = lang === 'tr' ? 'Lütfen bir hedef Fiyat girin.' : 'Please enter a target Price.';
     const errLast1s = lang === 'tr' ? 'Lütfen bir Tarih/Zaman (UTC) girin.' : 'Please enter a DateTime (UTC).';
-    const errLast1sData = lang === 'tr' ? 'O saniye için işlem verisi bulunamadı (Last Price).' : 'No trade data found for that second (Last Price).';
 
     try {
       if (mode === "trigger") {
         if (!at) return setError(errTime);
         const { mark, last } = await getTriggerMinuteCandles(activeSymbol, at, market);
 
-        if (!mark && !last) return setResult(errNoData);
+        if (!mark && !last) return setResult(t.lookupNotFound);
 
-        let msg = `${at} UTC+0 (${market.toUpperCase()}) = ` + (lang === 'tr' ? `Bu tarih ve saatte:` : `At this date and time:`) + `\n\n`;
+        let msg = `### 🕒 ${at} UTC+0\n` +
+          `**Symbol:** ${activeSymbol} | **Market:** ${market.toUpperCase()}\n\n` +
+          (lang === 'tr' ? `#### Fiyat Verileri:` : `#### Price Data:`) + `\n\n`;
 
-        // Mark Price (Futures Only)
         if (market === "futures") {
-          msg += `**Mark Price:**\n` + (lang === 'tr' ? `Açılış` : `Opening`) + `: ${mark?.open ?? "N/A"}\n` + (lang === 'tr' ? `Yüksek` : `Highest`) + `: ${mark?.high ?? "N/A"}\n` + (lang === 'tr' ? `Düşük` : `Lowest`) + `: ${mark?.low ?? "N/A"}\n` + (lang === 'tr' ? `Kapanış` : `Closing`) + `: ${mark?.close ?? "N/A"}\n\n`;
-        } else {
-          msg += `**Mark Price:** N/A (Spot Market)\n\n`;
+          msg += `> **Mark Price:**\n` +
+            `> - ` + (lang === 'tr' ? `Açılış` : `Open`) + `: ${mark?.open ?? "N/A"}\n` +
+            `> - ` + (lang === 'tr' ? `Yüksek` : `High`) + `: ${mark?.high ?? "N/A"}\n` +
+            `> - ` + (lang === 'tr' ? `Düşük` : `Low`) + `: ${mark?.low ?? "N/A"}\n` +
+            `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `: ${mark?.close ?? "N/A"}\n\n`;
         }
 
-        // Last Price (Both)
-        msg += `**Last Price:**\n` + (lang === 'tr' ? `Açılış` : `Opening`) + `: ${last?.open ?? "N/A"}\n` + (lang === 'tr' ? `Yüksek` : `Highest`) + `: ${last?.high ?? "N/A"}\n` + (lang === 'tr' ? `Düşük` : `Lowest`) + `: ${last?.low ?? "N/A"}\n` + (lang === 'tr' ? `Kapanış` : `Closing`) + `: ${last?.close ?? "N/A"}`;
+        msg += `> **Last Price:**\n` +
+          `> - ` + (lang === 'tr' ? `Açılış` : `Open`) + `: ${last?.open ?? "N/A"}\n` +
+          `> - ` + (lang === 'tr' ? `Yüksek` : `High`) + `: ${last?.high ?? "N/A"}\n` +
+          `> - ` + (lang === 'tr' ? `Düşük` : `Low`) + `: ${last?.low ?? "N/A"}\n` +
+          `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `: ${last?.close ?? "N/A"}`;
 
         setResult(msg);
 
       } else if (mode === "range") {
         if (!from || !to) return setError(errRange);
         const range = await getRangeHighLow(activeSymbol, from, to, market);
-        if (!range) return setResult(errNoData);
+        if (!range) return setResult(t.lookupNotFound);
 
-        let msg = (lang === 'tr' ? `${activeSymbol} (${market.toUpperCase()}) Fiyat Grafiğini kontrol ettiğimizde` : `When we check the ${activeSymbol} (${market.toUpperCase()}) Price Chart`) + `\n\n` +
-          (lang === 'tr' ? `Başlangıç` : `From`) + `: ${from}\n` + (lang === 'tr' ? `Bitiş` : `To`) + `: ${to}\n\n`;
-
-        if (market === "futures") {
-          msg += `${range.mark.highTime} > ` + (lang === 'tr' ? `Bu tarih ve saatte, en yüksek Mark Price ${range.mark.high} seviyesine ulaşıldı.` : `At this date and time, the highest Mark Price ${range.mark.high} was reached.`) + `\n`;
-        }
-
-        msg += `${range.last.highTime} > ` + (lang === 'tr' ? `Bu tarih ve saatte, en yüksek Last Price ${range.last.high} seviyesine ulaşıldı.` : `At this date and time, the highest Last Price ${range.last.high} was reached.`) + `\n\n`;
+        let msg = `### 📊 ` + (lang === 'tr' ? `Aralık Özeti` : `Range Summary`) + `\n` +
+          `**Symbol:** ${activeSymbol} | **Market:** ${market.toUpperCase()}\n` +
+          `**Period:** ${from} → ${to}\n\n` +
+          (lang === 'tr' ? `#### Analiz Sonuçları:` : `#### Analysis Results:`) + `\n\n`;
 
         if (market === "futures") {
-          msg += `${range.mark.lowTime} > ` + (lang === 'tr' ? `Bu tarih ve saatte, en düşük Mark Price ${range.mark.low} seviyesine ulaşıldı.` : `At this date and time, the lowest Mark Price ${range.mark.low} was reached.`) + `\n`;
+          msg += `✅ **Mark Price:**\n` +
+            `- ` + (lang === 'tr' ? `Zirve` : `Peak`) + `: ${range.mark.high} (${range.mark.highTime})\n` +
+            `- ` + (lang === 'tr' ? `Dip` : `Bottom`) + `: ${range.mark.low} (${range.mark.lowTime})\n` +
+            `- ` + (lang === 'tr' ? `Değişim` : `Volatility`) + `: ${range.mark.changePct}\n\n`;
         }
 
-        msg += `${range.last.lowTime} > ` + (lang === 'tr' ? `Bu tarih ve saatte, en düşük Last Price ${range.last.low} seviyesine ulaşıldı.` : `At this date and time, the lowest Last Price ${range.last.low} was reached.`) + `\n\n`;
-
-        if (market === "futures") {
-          msg += `**Mark Price ` + (lang === 'tr' ? `Değişim` : `Change`) + `:** ${range.mark.changePct}\n`;
-        }
-        msg += `**Last Price ` + (lang === 'tr' ? `Değişim` : `Change`) + `:** ${range.last.changePct}`;
+        msg += `✅ **Last Price:**\n` +
+          `- ` + (lang === 'tr' ? `Zirve` : `Peak`) + `: ${range.last.high} (${range.last.highTime})\n` +
+          `- ` + (lang === 'tr' ? `Dip` : `Bottom`) + `: ${range.last.low} (${range.last.lowTime})\n` +
+          `- ` + (lang === 'tr' ? `Değişim` : `Volatility`) + `: ${range.last.changePct}`;
 
         setResult(msg);
 
       } else if (mode === "last1s") {
         if (!at) return setError(errLast1s);
         const ohlc = await getLastPriceAtSecond(activeSymbol, at, market);
-        if (!ohlc) return setResult(errLast1sData);
-        const msg =
-          `${at} UTC+0 (${market.toUpperCase()}) = ` + (lang === 'tr' ? `Bu tarih ve saatte, Last Price detayları:` : `At this date and time, the Last Price details are:`) + `\n\n` +
-          `**` + (lang === 'tr' ? `Açılış` : `Opening`) + `:** ${ohlc.open}\n` + (lang === 'tr' ? `Yüksek` : `Highest`) + `: ${ohlc.high}\n` + (lang === 'tr' ? `Düşük` : `Lowest`) + `: ${ohlc.low}\n` + (lang === 'tr' ? `Kapanış` : `Closing`) + `: ${ohlc.close}\n` +
-          (lang === 'tr' ? `(o saniyedeki ${ohlc.count} işleme göre)` : `(based on ${ohlc.count} trades in that second)`);
+        if (!ohlc) return setResult(t.lookupNoTradeData);
+
+        const msg = `### ⚡ ` + (lang === 'tr' ? `Saniyelik Hassasiyet` : `Second Precision`) + `\n` +
+          `**Time:** ${at} UTC+0 (${market.toUpperCase()})\n\n` +
+          `> **Last Price Details:**\n` +
+          `> - ` + (lang === 'tr' ? `Açılış` : `Open`) + `: ${ohlc.open}\n` +
+          `> - ` + (lang === 'tr' ? `Yüksek` : `High`) + `: ${ohlc.high}\n` +
+          `> - ` + (lang === 'tr' ? `Düşük` : `Low`) + `: ${ohlc.low}\n` +
+          `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `\n\n` +
+          `ℹ️ ` + (lang === 'tr' ? `Bu veri o saniye içindeki **${ohlc.count}** işleme dayanmaktadır.` : `Derived from **${ohlc.count}** individual trades in this second.`);
         setResult(msg);
 
       } else if (mode === "findPrice") {
@@ -97,27 +103,31 @@ export default function PriceLookup({ lang, uiStrings }) {
 
         const finalType = (market === 'futures') ? priceType : 'last';
         const data = await findPriceOccurrences(activeSymbol, from, to, parseFloat(targetPrice), market, finalType);
-        if (!data || !data.first) return setResult(errNoData);
+
+        if (!data || !data.first) {
+          const noReachMsg = t.lookupPriceNotReached.replace("{price}", targetPrice);
+          return setResult(`${t.lookupNotFoundTitle}\n\n${noReachMsg}`);
+        }
 
         const typeLabel = finalType === 'mark' ? 'Mark Price' : 'Last Price';
-        let msg = (lang === 'tr' ? `${activeSymbol} (${market.toUpperCase()} - ${typeLabel}) paritesinde, ${targetPrice} fiyatına:` : `On ${activeSymbol} (${market.toUpperCase()} - ${typeLabel}), the price ${targetPrice}:`) + `\n\n`;
-
-        msg += (lang === 'tr' ? `✅ İLK ULAŞILAN ZAMAN:` : `✅ FIRST REACHED AT:`) + `\n` +
-          `${data.first.fmt} UTC+0` + `\n` +
-          (data.first.isExact ? (lang === 'tr' ? `(İşlem Takas Verisi doğrulandı)` : `(Verified via AggTrades)`) : (lang === 'tr' ? `(Dakikalık mum hassasiyeti)` : `(1m Candle precision)`)) + `\n\n`;
+        let msg = `## ${t.lookupFoundTitle}\n\n` +
+          `**Symbol:** ${activeSymbol} (${market.toUpperCase()})\n` +
+          `**Target:** ${targetPrice} (${typeLabel})\n` +
+          `**Search Period:** ${from} → ${to}\n\n` +
+          `--- \n\n` +
+          `✅ **` + (lang === 'tr' ? `İLK TEMAS ZAMANI` : `FIRST CONTACT TIME`) + `:**\n` +
+          `### 🕒 ${data.first.fmt} UTC+0\n` +
+          (data.first.isExact ? (lang === 'tr' ? `(🛡️ İşlem verileriyle milisaniye bazında doğrulandı)` : `(🛡️ Verified at millisecond level via AggTrades)`) : (lang === 'tr' ? `(📊 1 dakikalık mum verisiyle tespit edildi)` : `(📊 Detected via 1m Candle data)`)) + `\n\n`;
 
         if (data.others.length > 0) {
-          msg += (lang === 'tr' ? `🔁 SONRAKİ EŞLEŞMELER (Yaklaşık Dakikalar):` : `🔁 SUBSEQUENT MATCHES (Approx Minutes):`) + `\n`;
-          // Show first 10 matches only to avoid spam
+          msg += `🔄 **` + (lang === 'tr' ? `DİĞER EŞLEŞMELER` : `OTHER MATCHES`) + ` (` + (lang === 'tr' ? `Yaklaşık` : `Approx`) + `):**\n`;
           const limit = 10;
-          data.others.slice(0, limit).forEach(t => {
-            msg += `- ${t} UTC+0\n`;
+          data.others.slice(0, limit).forEach(tMatch => {
+            msg += `- ${tMatch} UTC+0\n`;
           });
           if (data.others.length > limit) {
-            msg += (lang === 'tr' ? `... ve ${data.others.length - limit} kez daha.` : `... and ${data.others.length - limit} more times.`);
+            msg += `\n*...` + (lang === 'tr' ? `ve ${data.others.length - limit} kez daha.` : `and ${data.others.length - limit} more instances.*`);
           }
-        } else {
-          msg += (lang === 'tr' ? `Bu aralıkta başka eşleşme yok.` : `No other matches in this range.`);
         }
 
         setResult(msg);
