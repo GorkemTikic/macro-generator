@@ -167,47 +167,59 @@ export default function PriceLookup({ lang, uiStrings }) {
 
         if (data.isActivated) {
           // STEP 1: Activation
-          msg += `🌟 **${t.trailingResultActivated}**\n` +
+          msg += `### ${t.trailingResultActivated}\n` +
             `> ${t.trailingStep1Desc}\n` +
-            `> 🕒 ${data.activationTime || from}\n\n`;
+            `> 🕒 **${data.activationTime || from}**\n\n`;
 
           // STEP 2: Peak Tracking
-          msg += `📈 **${t.trailingResultPeak}**\n` +
+          msg += `### ${t.trailingResultPeak}\n` +
             `> ${t.trailingStep2Desc}\n` +
             `> 💎 **${data.peakPrice}** (🕒 ${data.peakTime})\n\n`;
 
           const rbRate = data.maxObservedCallback || 0;
+          const currentTrigger = direction === 'short'
+            ? (data.peakPrice * (1 - cbRate / 100)).toFixed(5)
+            : (data.peakPrice * (1 + cbRate / 100)).toFixed(5);
 
           // STEP 3: Trigger or Waiting
           if (data.status === "triggered") {
-            msg += `🚀 **${t.trailingResultTrigger}**\n` +
+            msg += `### ${t.trailingResultTrigger}\n` +
               `> ${t.trailingStep3Desc}\n` +
-              `> ### 🕒 ${data.triggerTime}\n` +
-              `> 💵 Estimated Trigger Price: **${data.triggerPrice?.toFixed(5)}**\n\n`;
+              `> 🕒 **${data.triggerTime}**\n` +
+              `> 💵 Triggered at: **${data.triggerPrice?.toFixed(5)}**\n\n`;
           } else {
-            const currentTrigger = direction === 'short'
-              ? (data.peakPrice * (1 - cbRate / 100)).toFixed(5)
-              : (data.peakPrice * (1 + cbRate / 100)).toFixed(5);
-
-            msg += `⏳ **${lang === 'tr' ? 'Durum' : 'Status'}:**\n` +
+            msg += `### ${t.trailingResultTrigger}\n` +
               `> ${t.trailingStepNoTriggerDesc}\n\n` +
-              `> 💡 ${lang === 'tr' ? 'Sıradaki Tetikleme Fiyatı' : 'Next Trigger Price'}: **${currentTrigger}**\n\n`;
+              `> 💡 **${t.trailingNextTriggerTip}: ${currentTrigger}**\n\n`;
           }
 
-          // FOOTER: The Math
+          // AGENT SUMMARY (SCRIBABLE FOR CUSTOMER)
           msg += `--- \n` +
-            `📝 **${t.trailingReboundFormula}:**\n` +
+            `### ${t.trailingAgentSummary}\n` +
+            `> ${lang === 'tr'
+              ? `Emriniz **${data.activationTime || from}** tarihinde aktifleşti. Aktivasyondan sonra fiyat en uç **${data.peakPrice}** seviyesini gördü. Emrin tetiklenmesi için fiyatın bu noktadan **${cbRate}%** geri çekilerek **${currentTrigger}** seviyesine ulaşması gerekiyordu. ` +
+              (data.status === 'triggered'
+                ? `Fiyat bu seviyeye **${data.triggerTime}** tarihinde ulaştı ve tetiklendi.`
+                : `Fiyat şu ana kadar en fazla **%${rbRate.toFixed(2)}** geri çekildi, bu yüzden henüz tetiklenmedi.`)
+              : `Your order was activated at **${data.activationTime || from}**. After activation, the price reached an extreme of **${data.peakPrice}**. To trigger, the price needed to pull back **${cbRate}%** from that point to reach **${currentTrigger}**. ` +
+              (data.status === 'triggered'
+                ? `The price reached this level at **${data.triggerTime}** and triggered.`
+                : `The price has only pulled back **${rbRate.toFixed(2)}%** so far, which is why it hasn't triggered yet.`)}\n\n`;
+
+          // TECHNICAL BREAKDOWN
+          msg += `--- \n` +
+            `📝 **${t.trailingReboundFormula}**\n` +
             `> • ${t.trailingMaxDevLabel}: **${rbRate.toFixed(2)}%**\n` +
-            `> • ${lang === 'tr' ? 'Hedef' : 'Target'}: ${cbRate}% \n` +
+            `> • ${lang === 'tr' ? 'Hedef' : 'Target'}: **${cbRate}%** \n` +
             `> *(${direction === 'short' ? lang === 'tr' ? '(Zirve - En Düşük) / Zirve' : '(Peak - Bottom) / Peak' : lang === 'tr' ? '(En Yüksek - Dip) / Dip' : '(Rebound - Trough) / Trough'} = ${rbRate.toFixed(2)}%)*`;
 
         } else {
-          msg += `❌ **${t.trailingWaitDesc}**\n` +
+          msg += `### ❌ ${t.trailingResultNotActivated}\n` +
+            `> ${t.trailingWaitDesc}\n` +
             `> *(${direction === 'short' ? lang === 'tr' ? 'Fiyat Aktivasyon Fiyatına ulaşmadı' : 'Price never reached Activation Price' : lang === 'tr' ? 'Fiyat Aktivasyon Fiyatına düşmedi' : 'Price never dropped to Activation Price'})*`;
         }
         setResult(msg);
       }
-
     } catch (err: any) {
       setError(err.message || String(err));
     }
