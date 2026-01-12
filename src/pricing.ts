@@ -732,6 +732,7 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
     triggerTime,
     triggerPrice,
     maxObservedCallback,
+    isEstimated: priceType === "mark" && isActivated && triggerTime && (activationTime === triggerTime || peakTime === triggerTime),
     symbol,
     period: `${fromStr} -> ${toStr}`
   };
