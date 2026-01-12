@@ -3,8 +3,23 @@
 // Eğer CORS hatası alırsan buraya kendi proxy adresini yazabilirsin
 export const PROXY = "";
 
+// Alternative Binance API Base URLs for fallback
+const F_BASES = [
+  "https://fapi.binance.com",
+  "https://fapi1.binance.com",
+  "https://fapi2.binance.com",
+  "https://fapi3.binance.com"
+];
+
+const S_BASES = [
+  "https://api.binance.com",
+  "https://api1.binance.com",
+  "https://api2.binance.com",
+  "https://api3.binance.com"
+];
+
 /**
- * Helper: dakika başlangıcı UTC ms
+ * Helper: Dakika başlangıcı UTC ms
  */
 export function msMinuteStartUTC(tsStr) {
   const d = new Date(tsStr + "Z");
@@ -20,7 +35,7 @@ export function msMinuteStartUTC(tsStr) {
 }
 
 /**
- * Helper: format UTC datetime as YYYY-MM-DD HH:mm:ss UTC+0
+ * Helper: Format UTC datetime as YYYY-MM-DD HH:mm:ss UTC+0
  */
 function fmtUTC(ms) {
   const d = new Date(ms);
@@ -32,15 +47,34 @@ function fmtUTC(ms) {
 }
 
 /**
+ * Helper: Fetch with fallback across multiple base URLs
+ */
+async function fetchWithFallback(bases, path, kind = "") {
+  let lastError = null;
+  for (const base of bases) {
+    try {
+      const url = `${PROXY}${base}${path}`;
+      const res = await fetch(url);
+      if (res.ok) return await res.json();
+
+      if (res.status === 429) throw new Error("Binance Rate Limit (429). Please wait a moment.");
+      if (res.status === 418) throw new Error("IP Banned (418). Please use a VPN or Proxy.");
+      if (res.status === 451) throw new Error("Regional Block (451). This API is restricted in your region. Use a Proxy.");
+
+      lastError = new Error(`HTTP Error ${res.status}: ${res.statusText}`);
+    } catch (err) {
+      lastError = err;
+      // Continue to next base if it's a network error or transient failure
+      if (err.message.includes("Rate Limit") || err.message.includes("IP Banned") || err.message.includes("Regional Block")) {
+        throw err; // Stop if it's a hard limit
+      }
+    }
+  }
+  throw lastError || new Error(`Failed to fetch ${kind} data from all available Binance endpoints.`);
+}
+
+/**
  * İç kullanım: Büyük tarih aralıklarında kline'ları sayfalı (paginated) çeker.
- * Binance API 1 istekte en fazla ~1500 kline döndürür.
- *
- * @param {"mark"|"last"} kind
- * @param {string} symbol
- * @param {number} startMs UTC ms
- * @param {number} endMs UTC ms
- * @param {"futures"|"spot"} market
- * @param {string} interval "1m", "1h", "1d" vb.
  */
 async function fetchAllKlines(kind, symbol, startMs, endMs, market = "futures", interval = "1m") {
   const MAX_LIMIT = 1500;
@@ -48,25 +82,20 @@ async function fetchAllKlines(kind, symbol, startMs, endMs, market = "futures", 
   const out = [];
   let guard = 0;
 
-  // Interval duration in ms (approx for large intervals)
+  // Interval duration in ms
   let stepMs = 60_000;
   if (interval === "1h") stepMs = 3600_000;
   if (interval === "1d") stepMs = 86400_000;
 
   while (cur < endMs && guard++ < 1000) {
-    let base = "";
-    if (market === "futures") {
-      base = kind === "mark" ? "https://fapi.binance.com/fapi/v1/markPriceKlines" : "https://fapi.binance.com/fapi/v1/klines";
-    } else {
-      if (kind === "mark") return [];
-      base = "https://api.binance.com/api/v3/klines";
-    }
+    const bases = market === "futures" ? F_BASES : S_BASES;
+    const path = market === "futures"
+      ? (kind === "mark" ? `/fapi/v1/markPriceKlines` : `/fapi/v1/klines`)
+      : `/api/v3/klines`;
 
-    const url = `${PROXY}${base}?symbol=${encodeURIComponent(symbol)}&interval=${interval}&startTime=${cur}&endTime=${endMs}&limit=${MAX_LIMIT}`;
+    const fullPath = `${path}?symbol=${encodeURIComponent(symbol)}&interval=${interval}&startTime=${cur}&endTime=${endMs}&limit=${MAX_LIMIT}`;
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to fetch ${kind} price data (${market}) at ${interval}`);
-    const chunk = await res.json();
+    const chunk = await fetchWithFallback(bases, fullPath, kind);
 
     if (!Array.isArray(chunk) || !chunk.length) break;
 
@@ -103,28 +132,20 @@ export async function getTriggerMinuteCandles(symbol, triggeredAtStr, market = "
 
   // SPOT Handling
   if (market === "spot") {
-    // Spotta Mark Price yok
-    const spotUrl = `${PROXY}https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=1m&startTime=${start}&endTime=${end}`;
-    const spotRes = await fetch(spotUrl);
-    if (!spotRes.ok) throw new Error(`Failed to fetch Spot candle`);
-    const spotJson = await spotRes.json();
-
+    const path = `/api/v3/klines?symbol=${symbol}&interval=1m&startTime=${start}&endTime=${end}`;
+    const spotJson = await fetchWithFallback(S_BASES, path, "Spot");
     return {
-      mark: null, // Spotta mark yok
+      mark: null,
       last: spotJson.length ? parseCandle(spotJson[0]) : null
     };
   }
 
   // FUTURES Handling (Standard)
-  const markUrl = `${PROXY}https://fapi.binance.com/fapi/v1/markPriceKlines?symbol=${symbol}&interval=1m&startTime=${start}&endTime=${end}`;
-  const markRes = await fetch(markUrl);
-  if (!markRes.ok) throw new Error(`Failed to fetch Mark Price candle`);
-  const markJson = await markRes.json();
+  const markPath = `/fapi/v1/markPriceKlines?symbol=${symbol}&interval=1m&startTime=${start}&endTime=${end}`;
+  const markJson = await fetchWithFallback(F_BASES, markPath, "Mark Price");
 
-  const lastUrl = `${PROXY}https://fapi.binance.com/fapi/v1/klines?symbol=${symbol}&interval=1m&startTime=${start}&endTime=${end}`;
-  const lastRes = await fetch(lastUrl);
-  if (!lastRes.ok) throw new Error(`Failed to fetch Last Price candle`);
-  const lastJson = await lastRes.json();
+  const lastPath = `/fapi/v1/klines?symbol=${symbol}&interval=1m&startTime=${start}&endTime=${end}`;
+  const lastJson = await fetchWithFallback(F_BASES, lastPath, "Last Price");
 
   return {
     mark: markJson.length ? parseCandle(markJson[0]) : null,
@@ -254,16 +275,12 @@ export async function getLastPriceAtSecond(symbol, atStr, market = "futures") {
   const end = start + 1000;
 
   // URL Config
-  let url = "";
-  if (market === "futures") {
-    url = `${PROXY}https://fapi.binance.com/fapi/v1/aggTrades?symbol=${symbol}&startTime=${start}&endTime=${end}&limit=1000`;
-  } else {
-    url = `${PROXY}https://api.binance.com/api/v3/aggTrades?symbol=${symbol}&startTime=${start}&endTime=${end}&limit=1000`;
-  }
+  const bases = market === "futures" ? F_BASES : S_BASES;
+  const path = market === "futures"
+    ? `/fapi/v1/aggTrades?symbol=${symbol}&startTime=${start}&endTime=${end}&limit=1000`
+    : `/api/v3/aggTrades?symbol=${symbol}&startTime=${start}&endTime=${end}&limit=1000`;
 
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch aggTrades for that second");
-  const trades = await res.json();
+  const trades = await fetchWithFallback(bases, path, "aggTrades");
   if (!trades.length) return null;
 
   const prices = trades.map((t) => parseFloat(t.p));
@@ -284,23 +301,25 @@ export async function getNearestFunding(symbol, targetUtcStr) {
   if (isNaN(targetMs)) throw new Error("Invalid date format.");
 
   for (const windowMin of [10, 30, 90]) {
-    const url = `${PROXY}https://fapi.binance.com/fapi/v1/fundingRate?symbol=${symbol.toUpperCase()}&startTime=${targetMs - windowMin * 60_000}&endTime=${targetMs + windowMin * 60_000}&limit=1000`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch fundingRate");
-    const rows = await res.json();
-    if (rows && rows.length) {
-      rows.sort(
-        (a, b) =>
-          Math.abs(parseInt(a.fundingTime) - targetMs) -
-          Math.abs(parseInt(b.fundingTime) - targetMs)
-      );
-      const rec = rows[0];
-      return {
-        funding_time: fmtUTC(Number(rec.fundingTime)),
-        funding_rate: parseFloat(rec.fundingRate),
-        mark_price: rec.markPrice || null,
-        funding_time_ms: Number(rec.fundingTime)
-      };
+    const path = `/fapi/v1/fundingRate?symbol=${symbol.toUpperCase()}&startTime=${targetMs - windowMin * 60_000}&endTime=${targetMs + windowMin * 60_000}&limit=1000`;
+    try {
+      const rows = await fetchWithFallback(F_BASES, path, "fundingRate");
+      if (rows && rows.length) {
+        rows.sort(
+          (a, b) =>
+            Math.abs(parseInt(a.fundingTime) - targetMs) -
+            Math.abs(parseInt(b.fundingTime) - targetMs)
+        );
+        const rec = rows[0];
+        return {
+          funding_time: fmtUTC(Number(rec.fundingTime)),
+          funding_rate: parseFloat(rec.fundingRate),
+          mark_price: rec.markPrice || null,
+          funding_time_ms: Number(rec.fundingTime)
+        };
+      }
+    } catch (e) {
+      if (windowMin === 90) throw e; // Only throw on final attempt
     }
   }
   return null;
@@ -313,15 +332,17 @@ export async function getMarkPriceClose1m(symbol, fundingTimeMs) {
   const startMinute = fundingTimeMs - (fundingTimeMs % 60_000);
   const candidates = [startMinute, startMinute - 60_000];
   for (const start of candidates) {
-    const url = `${PROXY}https://fapi.binance.com/fapi/v1/markPriceKlines?symbol=${symbol.toUpperCase()}&interval=1m&startTime=${start}&limit=1`;
-    const res = await fetch(url);
-    if (!res.ok) continue;
-    const data = await res.json();
-    if (Array.isArray(data) && data.length) {
-      return {
-        mark_price: parseFloat(data[0][4]),
-        close_time: fmtUTC(Number(data[0][6]))
-      };
+    const path = `/fapi/v1/markPriceKlines?symbol=${symbol.toUpperCase()}&interval=1m&startTime=${start}&limit=1`;
+    try {
+      const data = await fetchWithFallback(F_BASES, path, "Mark Price fallack");
+      if (Array.isArray(data) && data.length) {
+        return {
+          mark_price: parseFloat(data[0][4]),
+          close_time: fmtUTC(Number(data[0][6]))
+        };
+      }
+    } catch (e) {
+      // Continue to next candidate
     }
   }
   return null;
@@ -335,10 +356,8 @@ let symbolPrecisionCache = null;
 export async function getAllSymbolPrecisions() {
   if (symbolPrecisionCache) return symbolPrecisionCache;
 
-  const url = `${PROXY}https://fapi.binance.com/fapi/v1/exchangeInfo`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error("Failed to fetch exchangeInfo");
-  const data = await res.json();
+  const path = `/fapi/v1/exchangeInfo`;
+  const data = await fetchWithFallback(F_BASES, path, "exchangeInfo");
 
   const map = {};
   for (const s of data.symbols) {
@@ -432,16 +451,12 @@ async function findMatchInAggTrades(symbol, minuteMs, target, market) {
   // Safety break
   let pages = 0;
   while (startTime < endTime && pages < 10) {
-    let url = "";
-    if (market === "futures") {
-      url = `${PROXY}https://fapi.binance.com/fapi/v1/aggTrades?symbol=${symbol}&startTime=${startTime}&endTime=${endTime}&limit=1000`;
-    } else {
-      url = `${PROXY}https://api.binance.com/api/v3/aggTrades?symbol=${symbol}&startTime=${startTime}&endTime=${endTime}&limit=1000`;
-    }
+    const bases = market === "futures" ? F_BASES : S_BASES;
+    const path = market === "futures"
+      ? `/fapi/v1/aggTrades?symbol=${symbol}&startTime=${startTime}&endTime=${endTime}&limit=1000`
+      : `/api/v3/aggTrades?symbol=${symbol}&startTime=${startTime}&endTime=${endTime}&limit=1000`;
 
-    const res = await fetch(url);
-    if (!res.ok) break;
-    const trades = await res.json();
+    const trades = await fetchWithFallback(bases, path, "aggTrades search");
 
     if (!trades.length) break;
 

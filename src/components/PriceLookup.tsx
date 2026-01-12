@@ -123,8 +123,8 @@ export default function PriceLookup({ lang, uiStrings }) {
         setResult(msg);
       }
 
-    } catch (err) {
-      setError(err.message);
+    } catch (err: any) {
+      setError(err.message || String(err));
     }
   }
 
