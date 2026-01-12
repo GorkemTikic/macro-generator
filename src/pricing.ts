@@ -623,7 +623,9 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
 
       if (currentDev >= callbackRate) {
         triggerTime = fmtUTC(t);
-        triggerPrice = p;
+        triggerPrice = direction === "short"
+          ? peakPrice * (1 - callbackRate / 100)
+          : peakPrice * (1 + callbackRate / 100);
 
         // --- ENHANCEMENT: Second Precision ---
         if (priceType === "last" && market === "futures") {
