@@ -624,7 +624,7 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
             const bases = F_BASES;
             const trades = await fetchWithFallback(bases, `/fapi/v1/aggTrades?symbol=${symbol}&startTime=${t}&endTime=${t + 59999}`, "AggTrades");
             if (trades && trades.length) {
-              let localPeak = -Infinity;
+              let localPeak = peakPrice; // Inherit global peak found in previous minutes
               let foundActivation = false;
               let foundTrigger = false;
 
@@ -686,7 +686,7 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
             const bases = F_BASES;
             const trades = await fetchWithFallback(bases, `/fapi/v1/aggTrades?symbol=${symbol}&startTime=${t}&endTime=${t + 59999}`, "AggTrades");
             if (trades && trades.length) {
-              let localPeak = Infinity;
+              let localPeak = peakPrice; // Inherit global trough found in previous minutes
               let searchIsActivated = isActivated && activationTime !== fmtUTC(t);
 
               for (const tr of trades) {

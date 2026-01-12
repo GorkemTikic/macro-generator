@@ -184,7 +184,9 @@ export default function PriceLookup({ lang, uiStrings }) {
           // STEP 3: Trigger or Waiting
           if (data.status === "triggered") {
             msg += `### ${t.trailingResultTrigger}\n` +
-              `> ${t.trailingStep3Desc}\n` +
+              `> ${direction === 'short'
+                ? (lang === 'tr' ? 'Fiyat zirveden yeterince geri çekilerek emri tetikledi.' : 'The price pulled back from the peak enough to trigger.')
+                : (lang === 'tr' ? 'Fiyat dipten yeterince yukarı sıçrayarak emri tetikledi.' : 'The price rebounded from the trough enough to trigger.')}\n` +
               `> 🕒 **${data.triggerTime}**\n` +
               `> 💵 Triggered at: **${data.triggerPrice?.toFixed(5)}**\n\n`;
           } else {
@@ -197,19 +199,19 @@ export default function PriceLookup({ lang, uiStrings }) {
           msg += `--- \n` +
             `### ${t.trailingAgentSummary}\n` +
             `> ${lang === 'tr'
-              ? `Emriniz **${data.activationTime || from}** tarihinde aktifleşti. Aktivasyondan sonra fiyat en uç **${data.peakPrice}** seviyesini gördü. Emrin tetiklenmesi için fiyatın bu noktadan **${cbRate}%** geri çekilerek **${currentTrigger}** seviyesine ulaşması gerekiyordu. ` +
+              ? `Emriniz **${data.activationTime || from}** tarihinde aktifleşti. Aktivasyondan sonra fiyat en uç **${data.peakPrice}** seviyesini gördü. Emrin tetiklenmesi için fiyatın bu noktadan **${cbRate}%** ${direction === 'short' ? 'geri çekilerek' : 'yukarı sıçrayarak'} **${currentTrigger}** seviyesine ulaşması gerekiyordu. ` +
               (data.status === 'triggered'
                 ? `Fiyat bu seviyeye **${data.triggerTime}** tarihinde ulaştı ve tetiklendi.`
-                : `Fiyat şu ana kadar en fazla **%${rbRate.toFixed(2)}** geri çekildi, bu yüzden henüz tetiklenmedi.`)
-              : `Your order was activated at **${data.activationTime || from}**. After activation, the price reached an extreme of **${data.peakPrice}**. To trigger, the price needed to pull back **${cbRate}%** from that point to reach **${currentTrigger}**. ` +
+                : `Fiyat şu ana kadar en fazla **%${rbRate.toFixed(2)}** ${direction === 'short' ? 'geri çekildi' : 'yukarı sıçradı'}, bu yüzden henüz tetiklenmedi.`)
+              : `Your order was activated at **${data.activationTime || from}**. After activation, the price reached an extreme of **${data.peakPrice}**. To trigger, the price needed to ${direction === 'short' ? 'pull back' : 'rebound up'} **${cbRate}%** from that point to reach **${currentTrigger}**. ` +
               (data.status === 'triggered'
                 ? `The price reached this level at **${data.triggerTime}** and triggered.`
-                : `The price has only pulled back **${rbRate.toFixed(2)}%** so far, which is why it hasn't triggered yet.`)}\n\n`;
+                : `The price has only ${direction === 'short' ? 'pulled back' : 'rebounded'} **${rbRate.toFixed(2)}%** so far, which is why it hasn't triggered yet.`)}\n\n`;
 
           // TECHNICAL BREAKDOWN
           msg += `--- \n` +
             `📝 **${t.trailingReboundFormula}**\n` +
-            `> • ${t.trailingMaxDevLabel}: **${rbRate.toFixed(2)}%**\n` +
+            `> • ${direction === 'short' ? t.trailingPullback : t.trailingRebound}: **${rbRate.toFixed(2)}%**\n` +
             `> • ${lang === 'tr' ? 'Hedef' : 'Target'}: **${cbRate}%** \n` +
             `> *(${direction === 'short' ? lang === 'tr' ? '(Zirve - En Düşük) / Zirve' : '(Peak - Bottom) / Peak' : lang === 'tr' ? '(En Yüksek - Dip) / Dip' : '(Rebound - Trough) / Trough'} = ${rbRate.toFixed(2)}%)*\n\n` +
             `**${t.trailingAgentInternalTitle}:**\n` +
