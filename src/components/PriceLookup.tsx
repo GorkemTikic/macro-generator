@@ -171,9 +171,9 @@ export default function PriceLookup({ lang, uiStrings }) {
             `> ${t.trailingStep1Desc}\n` +
             `> 🕒 **${data.activationTime || from}**\n\n`;
 
-          // STEP 2: Peak Tracking
+          // STEP 2: Peak/Bottom Tracking
           msg += `### ${direction === 'short' ? t.trailingResultPeakLabel : t.trailingResultTroughLabel}\n` +
-            `> **${lang === 'tr' ? 'Referans Noktası (Çapa)' : 'Reference Point (Anchor)'}:** ${t.trailingStep2Desc}\n` +
+            `> **${lang === 'tr' ? 'Referans Noktası' : 'Reference Point'}:** ${t.trailingStep2Desc}\n` +
             `> 💎 **${data.peakPrice}** (🕒 ${data.peakTime})\n\n`;
 
           const rbRate = data.maxObservedCallback || 0;
@@ -186,7 +186,7 @@ export default function PriceLookup({ lang, uiStrings }) {
             msg += `### ${t.trailingResultTrigger}\n` +
               `> ${direction === 'short'
                 ? (lang === 'tr' ? 'Fiyat zirveden yeterince geri çekilerek emri tetikledi.' : 'The price pulled back from the peak enough to trigger.')
-                : (lang === 'tr' ? 'Fiyat dipten yeterince yukarı sıçrayarak emri tetikledi.' : 'The price rebounded from the trough enough to trigger.')}\n` +
+                : (lang === 'tr' ? 'Fiyat alttan (Bottom) yeterince sıçrayarak emri tetikledi.' : 'The price bounced up from the bottom enough to trigger.')}\n` +
               `> 🕒 **${data.triggerTime}**\n` +
               `> 💵 Triggered at: **${data.triggerPrice?.toFixed(5)}**\n\n`;
           } else {
@@ -199,11 +199,11 @@ export default function PriceLookup({ lang, uiStrings }) {
           msg += `--- \n` +
             `### ${t.trailingAgentSummary}\n` +
             `> ${lang === 'tr'
-              ? `Emriniz **${data.activationTime || from}** tarihinde aktifleşti. Aktivasyondan sonra fiyat en uç **${data.peakPrice}** seviyesini gördü. Emrin tetiklenmesi için fiyatın bu noktadan **${cbRate}%** ${direction === 'short' ? 'geri çekilerek' : 'yukarı sıçrayarak'} **${currentTrigger}** seviyesine ulaşması gerekiyordu. ` +
+              ? `Emriniz **${data.activationTime || from}** tarihinde aktifleşti. Aktivasyondan sonra fiyatın ulaştığı ${direction === 'short' ? 'en yüksek nokta (Peak)' : 'en düşük nokta (Bottom)'} **${data.peakPrice}** oldu. Emrin tetiklenmesi için fiyatın bu noktadan **${cbRate}%** ${direction === 'short' ? 'geri çekilerek' : 'yukarı sıçrayarak'} **${currentTrigger}** seviyesine ulaşması gerekiyordu. ` +
               (data.status === 'triggered'
                 ? `Fiyat bu seviyeye **${data.triggerTime}** tarihinde ulaştı ve tetiklendi.`
                 : `Fiyat şu ana kadar en fazla **%${rbRate.toFixed(2)}** ${direction === 'short' ? 'geri çekildi' : 'yukarı sıçradı'}, bu yüzden henüz tetiklenmedi.`)
-              : `Your order was activated at **${data.activationTime || from}**. After activation, the price reached an extreme of **${data.peakPrice}**. To trigger, the price needed to ${direction === 'short' ? 'pull back' : 'rebound up'} **${cbRate}%** from that point to reach **${currentTrigger}**. ` +
+              : `Your order was activated at **${data.activationTime || from}**. After activation, the price reached its ${direction === 'short' ? 'highest point (Peak)' : 'lowest point (Bottom)'} at **${data.peakPrice}**. To trigger, the price needed to move **${cbRate}%** ${direction === 'short' ? 'down' : 'up'} from that point to reach **${currentTrigger}**. ` +
               (data.status === 'triggered'
                 ? `The price reached this level at **${data.triggerTime}** and triggered.`
                 : `The price has only ${direction === 'short' ? 'pulled back' : 'rebounded'} **${rbRate.toFixed(2)}%** so far, which is why it hasn't triggered yet.`)}\n\n`;
