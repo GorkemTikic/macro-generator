@@ -4,7 +4,8 @@ import {
   getTriggerMinuteCandles,
   getRangeHighLow,
   getLastPriceAtSecond,
-  findPriceOccurrences, // ✅ Added
+  findPriceOccurrences,
+  checkTrailingStop, // ✅ Added
 } from "../pricing";
 
 import { useApp } from "../context/AppContext";
@@ -18,10 +19,22 @@ export default function PriceLookup({ lang, uiStrings }) {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [targetPrice, setTargetPrice] = useState(""); // ✅ New Input
+  const [activationPrice, setActivationPrice] = useState(""); // ✅ Trailing Stop
+  const [callbackRate, setCallbackRate] = useState(""); // ✅ Trailing Stop
+  const [direction, setDirection] = useState("short"); // "short" | "long"
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
 
   const t = uiStrings; // Çeviri metinleri
+
+  const setPresentTime = () => {
+    const now = new Date();
+    // 1 minute ago UTC
+    const past = new Date(now.getTime() - 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    const formatted = `${past.getUTCFullYear()}-${pad(past.getUTCMonth() + 1)}-${pad(past.getUTCDate())} ${pad(past.getUTCHours())}:${pad(past.getUTCMinutes())}:00`;
+    setTo(formatted);
+  };
 
   async function handleLookup() {
     setResult("");
@@ -30,6 +43,7 @@ export default function PriceLookup({ lang, uiStrings }) {
     const errRange = lang === 'tr' ? 'Lütfen Başlangıç ve Bitiş zamanlarını girin.' : 'Please enter both From and To.';
     const errPrice = lang === 'tr' ? 'Lütfen bir hedef Fiyat girin.' : 'Please enter a target Price.';
     const errLast1s = lang === 'tr' ? 'Lütfen bir Tarih/Zaman (UTC) girin.' : 'Please enter a DateTime (UTC).';
+    const errCallback = lang === 'tr' ? 'Lütfen Geri Dönüş Oranı girin.' : 'Please enter Callback Rate.';
 
     try {
       if (mode === "trigger") {
@@ -129,7 +143,68 @@ export default function PriceLookup({ lang, uiStrings }) {
             msg += `\n*...` + (lang === 'tr' ? `ve ${data.others.length - limit} kez daha.` : `and ${data.others.length - limit} more instances.*`);
           }
         }
+        setResult(msg);
 
+      } else if (mode === "trailing") {
+        if (!from || !to) return setError(errRange);
+        if (!callbackRate) return setError(errCallback);
+        if (!activationPrice) return setError(lang === 'tr' ? 'Lütfen Aktivasyon Fiyatı girin.' : 'Please enter Activation Price.');
+
+        const actPrice = parseFloat(activationPrice);
+        const cbRate = parseFloat(callbackRate);
+        const finalType = (market === 'futures') ? priceType : 'last';
+        const sTrim = activeSymbol.trim();
+        const fTrim = from.trim();
+        const tTrim = to.trim();
+
+        const data = await checkTrailingStop(sTrim, fTrim, tTrim, actPrice, cbRate, direction, market, finalType);
+
+        if (data.status === "not_found") {
+          return setResult(`${t.lookupNotFound}\n\nDEBUG: Symbol: ${sTrim}, From: ${fTrim}, To: ${tTrim}, Market: ${market}`);
+        }
+
+        let msg = `## ${data.status === 'triggered' ? t.trailingTriggeredTitle : t.trailingNotTriggeredTitle}\n\n`;
+
+        if (data.isActivated) {
+          // STEP 1: Activation
+          msg += `🌟 **${t.trailingResultActivated}**\n` +
+            `> ${t.trailingStep1Desc}\n` +
+            `> 🕒 ${data.activationTime || from}\n\n`;
+
+          // STEP 2: Peak Tracking
+          msg += `📈 **${t.trailingResultPeak}**\n` +
+            `> ${t.trailingStep2Desc}\n` +
+            `> 💎 **${data.peakPrice}** (🕒 ${data.peakTime})\n\n`;
+
+          const rbRate = data.maxObservedCallback || 0;
+
+          // STEP 3: Trigger or Waiting
+          if (data.status === "triggered") {
+            msg += `🚀 **${t.trailingResultTrigger}**\n` +
+              `> ${t.trailingStep3Desc}\n` +
+              `> ### 🕒 ${data.triggerTime}\n` +
+              `> 💵 Estimated Trigger Price: **${data.triggerPrice?.toFixed(5)}**\n\n`;
+          } else {
+            const currentTrigger = direction === 'short'
+              ? (data.peakPrice * (1 - cbRate / 100)).toFixed(5)
+              : (data.peakPrice * (1 + cbRate / 100)).toFixed(5);
+
+            msg += `⏳ **${lang === 'tr' ? 'Durum' : 'Status'}:**\n` +
+              `> ${t.trailingStepNoTriggerDesc}\n\n` +
+              `> 💡 ${lang === 'tr' ? 'Sıradaki Tetikleme Fiyatı' : 'Next Trigger Price'}: **${currentTrigger}**\n\n`;
+          }
+
+          // FOOTER: The Math
+          msg += `--- \n` +
+            `📝 **${t.trailingReboundFormula}:**\n` +
+            `> • ${t.trailingMaxDevLabel}: **${rbRate.toFixed(2)}%**\n` +
+            `> • ${lang === 'tr' ? 'Hedef' : 'Target'}: ${cbRate}% \n` +
+            `> *(${direction === 'short' ? lang === 'tr' ? '(Zirve - En Düşük) / Zirve' : '(Peak - Bottom) / Peak' : lang === 'tr' ? '(En Yüksek - Dip) / Dip' : '(Rebound - Trough) / Trough'} = ${rbRate.toFixed(2)}%)*`;
+
+        } else {
+          msg += `❌ **${t.trailingWaitDesc}**\n` +
+            `> *(${direction === 'short' ? lang === 'tr' ? 'Fiyat Aktivasyon Fiyatına ulaşmadı' : 'Price never reached Activation Price' : lang === 'tr' ? 'Fiyat Aktivasyon Fiyatına düşmedi' : 'Price never dropped to Activation Price'})*`;
+        }
         setResult(msg);
       }
 
@@ -160,7 +235,7 @@ export default function PriceLookup({ lang, uiStrings }) {
 
       {/* Mode Selection Cards */}
       <label className="label">{t.lookupMode}</label>
-      <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+      <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
         <div
           className={`option-card ${mode === 'trigger' ? 'active' : ''}`}
           onClick={() => setMode('trigger')}
@@ -178,6 +253,12 @@ export default function PriceLookup({ lang, uiStrings }) {
           onClick={() => setMode('findPrice')}
         >
           <span>Find 🔍</span>
+        </div>
+        <div
+          className={`option-card ${mode === 'trailing' ? 'active' : ''}`}
+          onClick={() => setMode('trailing')}
+        >
+          <span>Trailing 🔄</span>
         </div>
         <div
           className={`option-card ${mode === 'last1s' ? 'active' : ''}`}
@@ -200,6 +281,7 @@ export default function PriceLookup({ lang, uiStrings }) {
             className="input"
             value={activeSymbol}
             onChange={(e) => setActiveSymbol(e.target.value.toUpperCase())}
+            onBlur={(e) => setActiveSymbol(e.target.value.trim().toUpperCase())}
           />
         </div>
 
@@ -216,7 +298,7 @@ export default function PriceLookup({ lang, uiStrings }) {
           </div>
         )}
 
-        {(mode === "range" || mode === "findPrice") && (
+        {(mode === "range" || mode === "findPrice" || mode === "trailing") && (
           <>
             <div className="col-6">
               <label className="label">{t.lookupFrom}</label>
@@ -228,50 +310,163 @@ export default function PriceLookup({ lang, uiStrings }) {
               />
             </div>
             <div className="col-6">
-              <label className="label">{t.lookupTo}</label>
+              <label className="label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {t.lookupTo}
+                <button
+                  type="button"
+                  className="tab"
+                  style={{ padding: '2px 8px', fontSize: 11, height: 'auto' }}
+                  onClick={setPresentTime}
+                >
+                  ✨ {t.trailingPresentBtn}
+                </button>
+              </label>
               <input
                 className="input"
                 placeholder="YYYY-MM-DD HH:MM:SS"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
               />
+              <div className="helper" style={{ fontSize: 10, marginTop: 4 }}>
+                ℹ️ {t.trailingPresentNote}
+              </div>
             </div>
           </>
         )}
 
         {mode === "findPrice" && (
+          <div className="col-12">
+            <label className="label">{lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}</label>
+            <input
+              className="input"
+              type="number"
+              placeholder="Price (e.g. 95000)"
+              value={targetPrice}
+              onChange={(e) => setTargetPrice(e.target.value)}
+            />
+          </div>
+        )}
+
+        {mode === "trailing" && (
           <>
+            <div className="col-12" style={{ marginBottom: 4 }}>
+              <label className="label">{lang === 'tr' ? 'İşlem Yönü' : 'Trade Direction'}</label>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button
+                  type="button"
+                  className={`btn ${direction === 'long' ? 'active' : 'secondary'}`}
+                  style={{
+                    flex: 1,
+                    background: direction === 'long' ? '#2ebd85' : 'rgba(255,255,255,0.05)',
+                    color: direction === 'long' ? '#fff' : '#999',
+                    border: '1px solid ' + (direction === 'long' ? '#2ebd85' : 'rgba(255,255,255,0.1)'),
+                    boxShadow: direction === 'long' ? '0 0 15px rgba(46, 189, 133, 0.4)' : 'none',
+                    fontWeight: 800
+                  }}
+                  onClick={() => setDirection('long')}
+                >
+                  {t.trailingLong}
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${direction === 'short' ? 'active' : 'secondary'}`}
+                  style={{
+                    flex: 1,
+                    background: direction === 'short' ? '#f6465d' : 'rgba(255,255,255,0.05)',
+                    color: direction === 'short' ? '#fff' : '#999',
+                    border: '1px solid ' + (direction === 'short' ? '#f6465d' : 'rgba(255,255,255,0.1)'),
+                    boxShadow: direction === 'short' ? '0 0 15px rgba(246, 70, 93, 0.4)' : 'none',
+                    fontWeight: 800
+                  }}
+                  onClick={() => setDirection('short')}
+                >
+                  {t.trailingShort}
+                </button>
+              </div>
+            </div>
+
             <div className="col-12">
-              <label className="label">{lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}</label>
+              <div className="helper" style={{ color: '#aaa', fontSize: 11, background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.1)', marginBottom: 8 }}>
+                💡 <b>Tip:</b> {lang === 'tr' ? 'Emir verildikten sonraki değişimi görebilmek için "Bitiş" zamanını emrin güncel durumundan 1-2 saat sonrasına ayarlayın.' : 'To see the movements after order placement, set the "To" time at least 1-2 hours after the "From" time.'}
+              </div>
+            </div>
+
+            <div className="col-6">
+              <label className="label">{t.trailingActivation}</label>
               <input
                 className="input"
                 type="number"
-                placeholder="Price (e.g. 95000)"
-                value={targetPrice}
-                onChange={(e) => setTargetPrice(e.target.value)}
+                placeholder="e.g. 95000"
+                value={activationPrice}
+                onChange={(e) => setActivationPrice(e.target.value)}
+              />
+            </div>
+            <div className="col-6">
+              <label className="label">{t.trailingCallback}</label>
+              <input
+                className="input"
+                type="number"
+                placeholder="e.g. 1.5"
+                value={callbackRate}
+                onChange={(e) => setCallbackRate(e.target.value)}
               />
             </div>
 
+            {market === "futures" && (
+              <div className="col-12">
+                <label className="label">{t.trailingPriceType}</label>
+                <div style={{ display: 'flex', gap: 20, background: 'rgba(255,255,255,0.05)', padding: '10px 15px', borderRadius: 8 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, color: '#ccc' }}>
+                    <input
+                      type="radio"
+                      name="ptype_trailing"
+                      checked={priceType === 'last'}
+                      onChange={() => setPriceType('last')}
+                    />
+                    <span style={{ marginLeft: 6 }}>Last Price (Exact Trades)</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, color: '#ccc' }}>
+                    <input
+                      type="radio"
+                      name="ptype_trailing"
+                      checked={priceType === 'mark'}
+                      onChange={() => setPriceType('mark')}
+                    />
+                    <span style={{ marginLeft: 6 }}>Mark Price (1m High/Low)</span>
+                  </label>
+                </div>
+                {priceType === 'mark' && (
+                  <div className="helper" style={{ color: '#f59e0b', marginTop: 8, fontSize: 11 }}>
+                    ⚠️ {t.trailingMarkPrecisionWarning}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {mode === "findPrice" && (
+          <>
             {market === "futures" && (
               <div className="col-12" style={{ marginTop: -8 }}>
                 <div style={{ display: 'flex', gap: 15 }}>
                   <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, color: '#ccc' }}>
                     <input
                       type="radio"
-                      name="ptype"
+                      name="ptype_find"
                       checked={priceType === 'last'}
                       onChange={() => setPriceType('last')}
                     />
-                    <span style={{ marginLeft: 6 }}>Last Price (Exact)</span>
+                    <span style={{ marginLeft: 6 }}>Last Price</span>
                   </label>
                   <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: 13, color: '#ccc' }}>
                     <input
                       type="radio"
-                      name="ptype"
+                      name="ptype_find"
                       checked={priceType === 'mark'}
                       onChange={() => setPriceType('mark')}
                     />
-                    <span style={{ marginLeft: 6 }}>Mark Price (1m Approx)</span>
+                    <span style={{ marginLeft: 6 }}>Mark Price</span>
                   </label>
                 </div>
               </div>

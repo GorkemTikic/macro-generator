@@ -47,6 +47,15 @@ function fmtUTC(ms) {
 }
 
 /**
+ * Helper: Format MS as HH:mm:ss for short display
+ */
+function fmtFreq(ms) {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
+}
+
+/**
  * Helper: Fetch with fallback across multiple base URLs
  */
 async function fetchWithFallback(bases, path, kind = "") {
@@ -526,5 +535,205 @@ async function findMatchInAggTrades(symbol, minuteMs, target, market) {
   }
 
   return null; // Fallback to Minute resolution
+}
+
+/**
+ * 🎯 Trailing Stop Simulation (Binance Futures Logic)
+ * 1. Wait for Activation Price (if provided)
+ * 2. Track Peak (Sell/Short) or Trough (Buy/Long)
+ * 3. Trigger when price deviates by callbackRate from Peak/Trough
+ */
+export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice, callbackRate, direction, market = "futures", priceType = "last") {
+  // Normalize range to minute boundaries to ensure we get at least one 1m candle from Binance
+  let startMs = Date.parse(fromStr + "Z");
+  let endMs = Date.parse(toStr + "Z");
+  if (isNaN(startMs) || isNaN(endMs)) throw new Error("Invalid date format.");
+
+  if (endMs <= startMs) {
+    // If range is virtually instant or backward, extend to at least 1 minute
+    endMs = startMs + 60000;
+  }
+
+  // Align to minute start for the fetch to avoid empty responses from Binance
+  const fetchStart = Math.floor(startMs / 60000) * 60000;
+  const fetchEnd = Math.ceil(endMs / 60000) * 60000;
+
+  const fetchKind = priceType === "mark" ? "mark" : "last";
+  // Fetch 1m candles for the whole range
+  const candles = await fetchAllKlines(fetchKind, symbol, fetchStart, fetchEnd, market, "1m");
+
+  if (!candles.length) return { status: "not_found" };
+
+  let isActivated = !activationPrice; // If no activation price, it's active immediately
+  let activationTime = null;
+  let peakPrice = direction === "short" ? -Infinity : Infinity; // Highest High for Sell, Lowest Low for Buy
+  let peakTime = null;
+  let triggerTime = null;
+  let triggerPrice = null;
+  let maxObservedCallback = 0; // The closest the price got to triggering in %
+
+  const cbMultiplier = callbackRate / 100;
+
+  for (const c of candles) {
+    const t = Number(c[0]);
+    const high = parseFloat(c[2]);
+    const low = parseFloat(c[3]);
+    const open = parseFloat(c[1]);
+    const close = parseFloat(c[4]);
+
+    // Phase 1: Activation
+    if (!isActivated) {
+      if (direction === "short") {
+        // For Short/Sell: Activates when price >= activationPrice
+        if (high >= activationPrice) {
+          isActivated = true;
+          activationTime = fmtUTC(t);
+        }
+      } else {
+        // For Long/Buy: Activates when price <= activationPrice
+        if (low <= activationPrice) {
+          isActivated = true;
+          activationTime = fmtUTC(t);
+        }
+      }
+      if (!isActivated) continue; // Still waiting for activation
+    }
+
+    // Phase 2 & 3: Tracking Peak and checking Trigger
+    if (direction === "short") {
+      // Short/Sell: Track Highest High
+      if (high > peakPrice) {
+        peakPrice = high;
+        peakTime = fmtUTC(t);
+      }
+
+      // Check deviation: How much has the price dropped from the peak?
+      const currentDrop = ((peakPrice - low) / peakPrice) * 100;
+      if (currentDrop > maxObservedCallback) maxObservedCallback = currentDrop;
+
+      const currentTriggerPrice = peakPrice * (1 - cbMultiplier);
+      if (low <= currentTriggerPrice) {
+        triggerTime = fmtUTC(t);
+        triggerPrice = currentTriggerPrice;
+
+        // --- ENHANCEMENT: Second Precision ---
+        // If we have access to Last Price trades (aggTrades), we can find the exact second.
+        // We only do this if we are not using Mark Price as it's not possible to get 1s Mark Price history easily.
+        if (priceType === "last" && market === "futures") {
+          try {
+            const bases = F_BASES;
+            const trades = await fetchWithFallback(bases, `/fapi/v1/aggTrades?symbol=${symbol}&startTime=${t}&endTime=${t + 59999}`, "AggTrades");
+            if (trades && trades.length) {
+              let localPeak = -Infinity;
+              let foundActivation = false;
+              let foundTrigger = false;
+
+              // If activation was earlier, we start with the global peak.
+              // But if activation was THIS minute, we need to find it first.
+              let searchIsActivated = isActivated && activationTime !== fmtUTC(t);
+
+              for (const tr of trades) {
+                const p = parseFloat(tr.p);
+                const ts = Number(tr.T);
+
+                if (!searchIsActivated) {
+                  if (p >= activationPrice) {
+                    searchIsActivated = true;
+                    activationTime = fmtUTC(ts);
+                  }
+                }
+
+                if (searchIsActivated) {
+                  if (p > localPeak) {
+                    localPeak = p;
+                    peakPrice = p;
+                    peakTime = fmtUTC(ts);
+                  }
+                  if (p <= localPeak * (1 - cbMultiplier)) {
+                    triggerTime = fmtUTC(ts);
+                    triggerPrice = localPeak * (1 - cbMultiplier);
+                    foundTrigger = true;
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Failed second precision fetch:", e);
+          }
+        }
+        break;
+      }
+    } else {
+      // Long/Buy: Track Lowest Low
+      if (low < peakPrice) {
+        peakPrice = low;
+        peakTime = fmtUTC(t);
+      }
+
+      // Check deviation: How much has the price risen from the peak?
+      const currentRise = ((high - peakPrice) / peakPrice) * 100;
+      if (currentRise > maxObservedCallback) maxObservedCallback = currentRise;
+
+      const currentTriggerPrice = peakPrice * (1 + cbMultiplier);
+      if (high >= currentTriggerPrice) {
+        triggerTime = fmtUTC(t);
+        triggerPrice = currentTriggerPrice;
+
+        // --- ENHANCEMENT: Second Precision ---
+        if (priceType === "last" && market === "futures") {
+          try {
+            const bases = F_BASES;
+            const trades = await fetchWithFallback(bases, `/fapi/v1/aggTrades?symbol=${symbol}&startTime=${t}&endTime=${t + 59999}`, "AggTrades");
+            if (trades && trades.length) {
+              let localPeak = Infinity;
+              let searchIsActivated = isActivated && activationTime !== fmtUTC(t);
+
+              for (const tr of trades) {
+                const p = parseFloat(tr.p);
+                const ts = Number(tr.T);
+
+                if (!searchIsActivated) {
+                  if (p <= activationPrice) {
+                    searchIsActivated = true;
+                    activationTime = fmtUTC(ts);
+                  }
+                }
+
+                if (searchIsActivated) {
+                  if (p < localPeak) {
+                    localPeak = p;
+                    peakPrice = p;
+                    peakTime = fmtUTC(ts);
+                  }
+                  if (p >= localPeak * (1 + cbMultiplier)) {
+                    triggerTime = fmtUTC(ts);
+                    triggerPrice = localPeak * (1 + cbMultiplier);
+                    break;
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.warn("Failed second precision fetch:", e);
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  return {
+    status: triggerTime ? "triggered" : (isActivated ? "activated_no_trigger" : "not_activated"),
+    isActivated,
+    activationTime,
+    peakPrice: peakPrice === -Infinity || peakPrice === Infinity ? null : peakPrice,
+    peakTime,
+    triggerTime,
+    triggerPrice,
+    maxObservedCallback,
+    symbol,
+    period: `${fromStr} -> ${toStr}`
+  };
 }
 
