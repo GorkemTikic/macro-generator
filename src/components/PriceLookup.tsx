@@ -452,11 +452,6 @@ export default function PriceLookup({ lang, uiStrings }) {
                     <span style={{ marginLeft: 6 }}>Mark Price (1m High/Low)</span>
                   </label>
                 </div>
-                {priceType === 'mark' && (
-                  <div className="helper" style={{ color: '#f59e0b', marginTop: 8, fontSize: 11 }}>
-                    ⚠️ {t.trailingMarkPrecisionWarning}
-                  </div>
-                )}
               </div>
             )}
           </>
