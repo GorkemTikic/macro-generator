@@ -172,8 +172,10 @@ export default function PriceLookup({ lang, uiStrings }) {
             `> 🕒 **${data.activationTime || from}**\n\n`;
 
           // STEP 2: Peak Tracking
-          msg += `### ${t.trailingResultPeak}\n` +
-            `> ${t.trailingStep2Desc}\n` +
+          msg += `### ${direction === 'short' ? t.trailingResultPeakLabel : t.trailingResultTroughLabel}\n` +
+            `> ${direction === 'short'
+              ? (lang === 'tr' ? 'Aktivasyondan sonra sistem şu en yüksek (Zirve) fiyat noktasını takip etti:' : 'After activation, the system tracked this highest (Peak) price point:')
+              : (lang === 'tr' ? 'Aktivasyondan sonra sistem şu en düşük (Dip) fiyat noktasını takip etti:' : 'After activation, the system tracked this lowest (Trough) price point:')}\n` +
             `> 💎 **${data.peakPrice}** (🕒 ${data.peakTime})\n\n`;
 
           const rbRate = data.maxObservedCallback || 0;
