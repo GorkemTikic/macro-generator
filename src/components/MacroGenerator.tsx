@@ -216,6 +216,23 @@ export default function MacroGenerator({ lang, uiStrings }) {
   const [pasteData, setPasteData] = useState("");
   const [parseError, setParseError] = useState("");
 
+  // Password Protection State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const requireAuth = (callback: Function) => {
+    if (isAuthenticated) {
+      callback();
+      return;
+    }
+    const pwd = window.prompt(lang === 'tr' ? "Bu aracı kullanmak için lütfen şifreyi giriniz:" : "Please enter the password to use this tool:");
+    if (pwd === "112233") {
+      setIsAuthenticated(true);
+      callback();
+    } else if (pwd !== null) {
+      alert(lang === 'tr' ? "Hatalı şifre!" : "Incorrect password!");
+    }
+  };
+
   // Sync Active Symbol -> Inputs
   useEffect(() => {
     setInputs(prev => ({ ...prev, symbol: activeSymbol }));
@@ -569,7 +586,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
 
       {/* Main Form */}
       <div className="col-12" style={{ marginBottom: 16 }}>
-        <button className="btn secondary" onClick={openParseModal}>
+        <button className="btn secondary" onClick={() => requireAuth(openParseModal)}>
           {t.pasteButtonLabel}
         </button>
       </div>
@@ -648,7 +665,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
           <button
             className="btn"
             id="generate-btn"
-            onClick={handleGenerate}
+            onClick={() => requireAuth(handleGenerate)}
             disabled={loading}
           >
             {loading ? t.generating : t.generate}
@@ -659,7 +676,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
           <button
             className="btn secondary"
             id="copy-btn"
-            onClick={handleCopy}
+            onClick={() => requireAuth(handleCopy)}
             disabled={!result}
           >
             {t.copy}
