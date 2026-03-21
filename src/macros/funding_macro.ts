@@ -65,10 +65,10 @@ So all **${payer}** positions which were open at funding time had to pay funding
 
 Your position was a **${funding_side}** position, so you ${actionText} **${counterparty}** position holders.  
 
-**Your Position Size:** ${fmtNum(size, qty_dp)} ${symbol}  
+**Your Position Size:** ${size} ${symbol}  
 
 **Calculation:** 
-- ${fmtNum(size, qty_dp)} × ${mark} = ${fmtNum(notional, 8)} USDT → Notional size of the position  
+- ${size} × ${mark} = ${fmtNum(notional, 8)} USDT → Notional size of the position  
 - ${fmtNum(notional, 8)} × ${ratePctStr}% = ${fmtNum(Math.abs(fundingFee), 8)} USDT → Funding fee ${mathAction} from this position  
 
 For further details, you may check the official guide:  
@@ -98,7 +98,7 @@ For further details, you may check the official guide:
 **Mark Price:** ${mark}  
 **Funding Interval:** Every ${funding_interval || 8} hours  
 
-**Position Size:** ${fmtNum(size, qty_dp)} ${symbol}  
+**Position Size:** ${size} ${symbol}  
 Notional: ${fmtNum(notional, 8)} USDT  
 Your position: **${funding_side}** Funding Fee: ${fmtNum(Math.abs(fundingFee), 8)} USDT (${mathAction})`
           );
@@ -148,10 +148,10 @@ Bu durumda, funding zamanında açık olan tüm **${payer}** pozisyonları, pozi
 
 Sizin pozisyonunuz bir **${funding_side}** pozisyonuydu, bu nedenle **${actionText}**.  
 
-**Pozisyon Büyüklüğünüz:** ${fmtNum(size, qty_dp)} ${symbol}  
+**Pozisyon Büyüklüğünüz:** ${size} ${symbol}  
 
 **Hesaplama:**
-- ${fmtNum(size, qty_dp)} × ${mark} = ${fmtNum(notional, 8)} USDT → Pozisyonun Nosyonal (İtibari) Büyüklüğü  
+- ${size} × ${mark} = ${fmtNum(notional, 8)} USDT → Pozisyonun Nosyonal (İtibari) Büyüklüğü  
 - ${fmtNum(notional, 8)} × ${ratePctStr}% = ${fmtNum(Math.abs(fundingFee), 8)} USDT → Bu pozisyondan kaynaklanan Funding Ücreti ${mathAction}  
 
 Daha fazla detay için resmi rehberlerimizi inceleyebilirsiniz:  
@@ -181,7 +181,7 @@ Daha fazla detay için resmi rehberlerimizi inceleyebilirsiniz:
 **Mark Price:** ${mark}  
 **Funding Aralığı:** Her ${funding_interval || 8} saatte bir  
 
-**Pozisyon Büyüklüğü:** ${fmtNum(size, qty_dp)} ${symbol}  
+**Pozisyon Büyüklüğü:** ${size} ${symbol}  
 Nosyonal Değer: ${fmtNum(notional, 8)} USDT  
 Pozisyonunuz: **${funding_side}** Funding Ücreti: ${fmtNum(Math.abs(fundingFee), 8)} USDT (${mathAction})`
           );
