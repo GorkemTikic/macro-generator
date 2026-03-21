@@ -9,8 +9,6 @@ export function fmtNum(v, digits = 8) {
   const n = Number(v);
   if (!Number.isFinite(n)) return String(v);
 
-  // If digits is specifically passed as null/undefined, don't fix it? 
-  // No, let's stick to a default.
   return n.toFixed(digits);
 }
 
@@ -65,13 +63,13 @@ export function buildFullOHLCBlock(prices, lang = 'en', precision = 8) {
   const last = prices?.last;
 
   if (isTr) {
-    return `> **Mark Price (1d Mum):**
+    return `> **Mark Price (1dk Mum):**
 >   Açılış: ${fmtNum(mark?.open, precision)}
 >   Yüksek: ${fmtNum(mark?.high, precision)}
 >   Düşük:  ${fmtNum(mark?.low, precision)}
 >   Kapanış: ${fmtNum(mark?.close, precision)}
 > 
-> **Last Price (1d Mum):**
+> **Last Price (1dk Mum):**
 >   Açılış: ${fmtNum(last?.open, precision)}
 >   Yüksek: ${fmtNum(last?.high, precision)}
 >   Düşük:  ${fmtNum(last?.low, precision)}
@@ -99,7 +97,7 @@ export function buildLastPriceOHLCBlock(prices, lang = 'en', precision = 8) {
   const last = prices?.last;
 
   if (isTr) {
-    return `> **Last Price (1d Mum):**
+    return `> **Last Price (1dk Mum):**
 >   Açılış: ${fmtNum(last?.open, precision)}
 >   Yüksek: ${fmtNum(last?.high, precision)}
 >   Düşük:  ${fmtNum(last?.low, precision)}

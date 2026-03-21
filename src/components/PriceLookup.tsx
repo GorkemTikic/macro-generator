@@ -107,7 +107,7 @@ export default function PriceLookup({ lang, uiStrings }) {
           `> - ` + (lang === 'tr' ? `Açılış` : `Open`) + `: ${ohlc.open}\n` +
           `> - ` + (lang === 'tr' ? `Yüksek` : `High`) + `: ${ohlc.high}\n` +
           `> - ` + (lang === 'tr' ? `Düşük` : `Low`) + `: ${ohlc.low}\n` +
-          `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `\n\n` +
+          `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `: ${ohlc.close}\n\n` +
           `ℹ️ ` + (lang === 'tr' ? `Bu veri o saniye içindeki **${ohlc.count}** işleme dayanmaktadır.` : `Derived from **${ohlc.count}** individual trades in this second.`);
         setResult(msg);
 

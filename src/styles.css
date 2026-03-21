@@ -82,8 +82,24 @@ body {
   gap: 14px;
 }
 
+.col-4 {
+  grid-column: span 4;
+}
+
+.col-5 {
+  grid-column: span 5;
+}
+
 .col-6 {
   grid-column: span 6;
+}
+
+.col-7 {
+  grid-column: span 7;
+}
+
+.col-8 {
+  grid-column: span 8;
 }
 
 .col-12 {
@@ -92,7 +108,11 @@ body {
 
 @media (max-width: 900px) {
 
+  .col-4,
+  .col-5,
   .col-6,
+  .col-7,
+  .col-8,
   .col-12 {
     grid-column: span 12;
   }
@@ -183,6 +203,7 @@ body {
 .tabs {
   display: flex;
   gap: 10px;
+  margin-left: auto; /* Pushes tabs and lang-switcher to the right */
 }
 
 .tab {
@@ -213,7 +234,6 @@ body {
 .lang-switcher {
   display: flex;
   gap: 6px;
-  margin-left: auto;
 }
 
 .lang-btn {

@@ -180,7 +180,7 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
   if (market === "spot") {
     const lastCandles = await fetchAllKlines("last", symbol, start, end, "spot", "1m");
 
-    let lastHigh, lastLow, lastHighTime, lastLowTime;
+    let lastHigh, lastLow, lastHighTime, lastLowTime, lastOpen, lastClose;
     const isNum = (v) => typeof v === "number" && !isNaN(v);
 
     if (lastCandles.length) {
@@ -192,13 +192,17 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
       const idxL = lows.indexOf(lastLow);
       lastHighTime = fmtUTC(Number(lastCandles[idxH][0]));
       lastLowTime = fmtUTC(Number(lastCandles[idxL][0]));
+      lastOpen = parseFloat(lastCandles[0][1]);
+      lastClose = parseFloat(lastCandles[lastCandles.length - 1][4]);
     }
 
     return {
-      mark: null, // Spot için Mark yok
+      mark: { open: "N/A", high: "N/A", low: "N/A", close: "N/A", highTime: "N/A", lowTime: "N/A", changePct: "N/A" }, // Consistency
       last: {
+        open: lastOpen ?? "N/A",
         high: lastHigh ?? "N/A",
         low: lastLow ?? "N/A",
+        close: lastClose ?? "N/A",
         highTime: lastHighTime ?? "N/A",
         lowTime: lastLowTime ?? "N/A",
         changePct:
@@ -217,12 +221,12 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
 
   if (!markCandles.length && !lastCandles.length) {
     return {
-      mark: { high: "N/A", low: "N/A", highTime: "N/A", lowTime: "N/A", changePct: "N/A" },
-      last: { high: "N/A", low: "N/A", highTime: "N/A", lowTime: "N/A", changePct: "N/A" },
+      mark: { open: "N/A", high: "N/A", low: "N/A", close: "N/A", highTime: "N/A", lowTime: "N/A", changePct: "N/A" },
+      last: { open: "N/A", high: "N/A", low: "N/A", close: "N/A", highTime: "N/A", lowTime: "N/A", changePct: "N/A" },
     };
   }
 
-  let markHigh, markLow, markHighTime, markLowTime;
+  let markHigh, markLow, markHighTime, markLowTime, markOpen, markClose;
   if (markCandles.length) {
     const highs = markCandles.map((c) => parseFloat(c[2]));
     const lows = markCandles.map((c) => parseFloat(c[3]));
@@ -232,9 +236,11 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
     const idxL = lows.indexOf(markLow);
     markHighTime = fmtUTC(Number(markCandles[idxH][0]));
     markLowTime = fmtUTC(Number(markCandles[idxL][0]));
+    markOpen = parseFloat(markCandles[0][1]);
+    markClose = parseFloat(markCandles[markCandles.length - 1][4]);
   }
 
-  let lastHigh, lastLow, lastHighTime, lastLowTime;
+  let lastHigh, lastLow, lastHighTime, lastLowTime, lastOpen, lastClose;
   if (lastCandles.length) {
     const highs = lastCandles.map((c) => parseFloat(c[2]));
     const lows = lastCandles.map((c) => parseFloat(c[3]));
@@ -244,14 +250,18 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
     const idxL = lows.indexOf(lastLow);
     lastHighTime = fmtUTC(Number(lastCandles[idxH][0]));
     lastLowTime = fmtUTC(Number(lastCandles[idxL][0]));
+    lastOpen = parseFloat(lastCandles[0][1]);
+    lastClose = parseFloat(lastCandles[lastCandles.length - 1][4]);
   }
 
   const isNum = (v) => typeof v === "number" && !isNaN(v);
 
   return {
     mark: {
+      open: markOpen ?? "N/A",
       high: markHigh ?? "N/A",
       low: markLow ?? "N/A",
+      close: markClose ?? "N/A",
       highTime: markHighTime ?? "N/A",
       lowTime: markLowTime ?? "N/A",
       changePct:
@@ -260,8 +270,10 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
           : "N/A",
     },
     last: {
+      open: lastOpen ?? "N/A",
       high: lastHigh ?? "N/A",
       low: lastLow ?? "N/A",
+      close: lastClose ?? "N/A",
       highTime: lastHighTime ?? "N/A",
       lowTime: lastLowTime ?? "N/A",
       changePct:
@@ -343,7 +355,7 @@ export async function getMarkPriceClose1m(symbol, fundingTimeMs) {
   for (const start of candidates) {
     const path = `/fapi/v1/markPriceKlines?symbol=${symbol.toUpperCase()}&interval=1m&startTime=${start}&limit=1`;
     try {
-      const data = await fetchWithFallback(F_BASES, path, "Mark Price fallack");
+      const data = await fetchWithFallback(F_BASES, path, "Mark Price fallback");
       if (Array.isArray(data) && data.length) {
         return {
           mark_price: parseFloat(data[0][4]),
@@ -572,7 +584,8 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
   let triggerPrice = null;
   let maxObservedCallback = 0; // The closest the price got to triggering in %
 
-  const cbMultiplier = callbackRate / 100;
+  // Used only for logging or internal logic if needed, but not actively used in loop
+  // const cbMultiplier = callbackRate / 100; 
 
   for (const c of candles) {
     const t = Number(c[0]);
