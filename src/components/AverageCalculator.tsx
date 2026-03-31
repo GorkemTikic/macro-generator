@@ -200,116 +200,264 @@ export default function AverageCalculator({ lang, uiStrings }) {
     let closeQty = 0;
     let closeCost = 0;
     let averageClose = 0;
+    
+    let netPosition = 0; // Negative for Short, Positive for Long
+    let isFlipped = false;
+
+    const historicalPositions = [];
+    let curPosIndex = 1;
+    let phaseStartDate = null;
 
     const processedList = [];
-    const entryFormulaParts = [];
-    const closeFormulaParts = [];
+    let entryFormulaParts = [];
+    let closeFormulaParts = [];
+    let entryOrderIds = [];
+    let closeOrderIds = [];
 
     for (let tr of consolidatedOrders) {
-        let isEntrySide = false;
+        if (!phaseStartDate) phaseStartDate = tr.date;
+        
+        let entryAmt = 0;
+        let closeAmt = 0;
+        let isFlipped = false;
+        let flipAlertText = "";
+        let flipAlertHtml = "";
 
-        if (activeModeForTrade === 'LONG') {
-            isEntrySide = (tr.side === 'BUY');
-        } else { 
-            isEntrySide = (tr.side === 'SELL');
+        if (modeType === 'HEDGE_LONG') {
+            if (tr.side === 'BUY') entryAmt = tr.qty; else closeAmt = tr.qty;
+            netPosition += (tr.side === 'BUY' ? tr.qty : -tr.qty);
+        } else if (modeType === 'HEDGE_SHORT') {
+            if (tr.side === 'SELL') entryAmt = tr.qty; else closeAmt = tr.qty;
+            netPosition += (tr.side === 'SELL' ? -tr.qty : tr.qty);
+        } else {
+            // BOTH Mode / One-Way: We determine Entry/Close dynamically based on true Net Position to detect flips.
+            if (tr.side === 'BUY') {
+                if (netPosition <= -0.00000001) {
+                    closeAmt = Math.min(tr.qty, Math.abs(netPosition));
+                    entryAmt = Math.max(0, tr.qty - closeAmt);
+                } else {
+                    entryAmt = tr.qty;
+                }
+                netPosition += tr.qty;
+            } else { // SELL
+                if (netPosition >= 0.00000001) {
+                    closeAmt = Math.min(tr.qty, netPosition);
+                    entryAmt = Math.max(0, tr.qty - closeAmt);
+                } else {
+                    entryAmt = tr.qty;
+                }
+                netPosition -= tr.qty;
+            }
+
+            if (entryAmt > 0.00000001 && closeAmt > 0.00000001) {
+                isFlipped = true;
+                let closedSide = tr.side === 'BUY' ? 'Short' : 'Long';
+                let openedSide = tr.side === 'BUY' ? 'Long' : 'Short';
+                flipAlertText = t.avgFlipCopy(tr.qty.toFixed(4), closeAmt.toFixed(4), symbol, closedSide, entryAmt.toFixed(4), openedSide);
+                flipAlertHtml = t.avgFlipHtml(tr.qty.toFixed(4), closeAmt.toFixed(4), symbol, closedSide, entryAmt.toFixed(4), openedSide);
+            }
         }
 
-        if (isEntrySide) {
+        // --- Determine Dynamic Position Description ---
+        let currentPosString = posDesc; // default from mode
+        if (modeType === 'BOTH') {
+            let posBeforeTrade = netPosition - (tr.side === 'BUY' ? tr.qty : -tr.qty);
+            if (posBeforeTrade > 0.00000001) currentPosString = 'LONG';
+            else if (posBeforeTrade < -0.00000001) currentPosString = 'SHORT';
+            else {
+                // If it was exactly 0 before this trade, what did the user select in UI?
+                // Actually, if we're opening a brand new position, it's what the trade dictates.
+                currentPosString = tr.side === 'BUY' ? 'LONG' : 'SHORT';
+            }
+        }
+
+        let copyText = "";
+        let htmlText = "";
+        let localActionType = 'ENTRY'; // Default border color
+        let verb = tr.side === 'BUY' ? t.avgVerbBought : t.avgVerbSold;
+
+        // 1. Process CLOSE amount first (finishing off the old position)
+        if (closeAmt > 0.00000001) {
+            let oldQty = closeQty;
+            let oldAvg = averageClose;
+
+            closeCost += (closeAmt * tr.price);
+            closeQty += closeAmt;
+            averageClose = closeCost / closeQty;
+            closeFormulaParts.push(`(${closeAmt.toFixed(4)} x ${tr.price.toFixed(4)})`);
+            closeOrderIds.push(tr.orderId);
+
+            let posBeforeTrade = netPosition - (tr.side === 'BUY' ? tr.qty : -tr.qty);
+            let isFullyClosed = false;
+            if (modeType === 'BOTH') {
+               isFullyClosed = (Math.abs(posBeforeTrade) - closeAmt) <= 0.00000001;
+            } else {
+               isFullyClosed = (entryQty - closeQty) <= 0.00000001; 
+            }
+            
+            let builderFunc = isFullyClosed ? t.avgBuildClosedText : t.avgBuildReducedText;
+            
+            let baseCopy = builderFunc(currentPosString, tr.orderId, closeAmt.toFixed(4), symbol, verb, tr.price.toFixed(4), false);
+            let baseHtml = builderFunc(currentPosString, tr.orderId, closeAmt.toFixed(4), symbol, verb, tr.price.toFixed(4), true);
+
+            copyText += baseCopy + `\n> ${t.avgCopyCloseNew} **${averageClose.toFixed(8)}**`;
+            let calcStr = `((${oldQty.toFixed(4)} x ${oldAvg.toFixed(4)}) + (${closeAmt.toFixed(4)} x ${tr.price.toFixed(4)})) / ${closeQty.toFixed(4)}`;
+            if (oldQty > 0) copyText += `\n> ${t.avgCalcPrefix} ${calcStr}`;
+
+            htmlText += baseHtml + `<div style="margin-top: 8px; color: var(--accent-2); font-family: monospace; font-size: 12px; opacity: 0.8;">${t.avgCopyCloseNew} <strong>${averageClose.toFixed(8)}</strong></div>`;
+            if (oldQty > 0) htmlText += `<div style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; font-family: monospace; font-size: 11px; opacity: 0.7;">${t.avgCalcPrefix} <em>${calcStr}</em></div>`;
+            
+            localActionType = 'CLOSE';
+        }
+
+        let isFullyClosedToZero = Math.abs(netPosition) < 0.00000001;
+
+        // 2. Process FLIP Logic or Full Close (Ending the Phase)
+        if (isFlipped || isFullyClosedToZero) {
+            if (isFlipped) {
+                copyText += flipAlertText;
+                htmlText += flipAlertHtml;
+                localActionType = 'FLIP';
+            }
+
+            // A phase naturally ends if the position is fully exhausted (to zero) OR flipped completely across zero.
+            historicalPositions.push({
+                index: curPosIndex,
+                direction: currentPosString, // The direction BEFORE the flip or of the closed position
+                startDate: phaseStartDate,
+                endDate: tr.date,
+                entryFormulaParts: entryFormulaParts,
+                closeFormulaParts: closeFormulaParts,
+                entryOrderIds: entryOrderIds,
+                closeOrderIds: closeOrderIds,
+                entryQty: entryQty,
+                averageEntry: averageEntry,
+                closeQty: closeQty,
+                averageClose: averageClose
+            });
+            curPosIndex++;
+            phaseStartDate = isFlipped ? tr.date : null; // If strictly closed to zero, next trade starts the new phase date
+
+            entryQty = 0; entryCost = 0; averageEntry = 0;
+            closeQty = 0; closeCost = 0; averageClose = 0;
+            entryFormulaParts = []; closeFormulaParts = [];
+            entryOrderIds = []; closeOrderIds = [];
+
+            // Switch current position string for the emerging ENTRY amount
+            if (isFlipped) {
+                currentPosString = tr.side === 'BUY' ? 'LONG' : 'SHORT';
+            }
+        }
+
+        // 3. Process ENTRY amount (expanding/starting the new position)
+        if (entryAmt > 0.00000001) {
             let oldQty = entryQty;
             let oldAvg = averageEntry;
 
-            entryCost += (tr.qty * tr.price);
-            entryQty += tr.qty;
+            entryCost += (entryAmt * tr.price);
+            entryQty += entryAmt;
             averageEntry = entryCost / entryQty;
-            entryFormulaParts.push(`(${tr.qty.toFixed(4)} x ${tr.price.toFixed(4)})`);
-
-            let verb = tr.side === 'BUY' ? t.avgVerbBought : t.avgVerbSold;
+            entryFormulaParts.push(`(${entryAmt.toFixed(4)} x ${tr.price.toFixed(4)})`);
+            entryOrderIds.push(tr.orderId);
             
-            let copyText, htmlText;
+            let builderFunc = Math.abs(oldQty) < 0.00000001 ? t.avgBuildStartedText : t.avgBuildExpandedText;
 
-            if (Math.abs(oldQty) < 0.00000001) {
-                let baseCopy = t.avgBuildStartedText(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), false);
-                let baseHtml = t.avgBuildStartedText(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), true);
-                
-                copyText = baseCopy + `\n> ${t.avgCopyEntryOld} **${averageEntry.toFixed(8)}**`;
-                htmlText = baseHtml + `<div style="margin-top: 8px; color: var(--accent); font-family: monospace; font-size: 12px; opacity: 0.8;">${t.avgCopyEntryOld} <strong>${averageEntry.toFixed(8)}</strong></div>`;
-            } else {
-                let baseCopy = t.avgBuildExpandedText(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), false);
-                let baseHtml = t.avgBuildExpandedText(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), true);
-
-                copyText = baseCopy + `\n> ${t.avgCopyEntryNew} **${averageEntry.toFixed(8)}**`;
-                let calcStr = `((${oldQty.toFixed(4)} x ${oldAvg.toFixed(4)}) + (${tr.qty.toFixed(4)} x ${tr.price.toFixed(4)})) / ${entryQty.toFixed(4)}`;
-                copyText += `\n> ${t.avgCalcPrefix} ${calcStr}`;
-
-                htmlText = baseHtml + `<div style="margin-top: 8px; color: var(--accent); font-family: monospace; font-size: 12px; opacity: 0.8;">${t.avgCopyEntryNew} <strong>${averageEntry.toFixed(8)}</strong></div>`;
-                htmlText += `<div style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; font-family: monospace; font-size: 11px; opacity: 0.7;">${t.avgCalcPrefix} <em>${calcStr}</em></div>`;
+            if (closeAmt > 0) {
+                copyText += '\n\n';
+                htmlText += '<div style="margin: 16px 0;"></div>';
             }
 
-            processedList.push({ ...tr, actionType: 'ENTRY', copyText, htmlText });
+            let baseCopy = builderFunc(currentPosString, tr.orderId, entryAmt.toFixed(4), symbol, verb, tr.price.toFixed(4), false);
+            let baseHtml = builderFunc(currentPosString, tr.orderId, entryAmt.toFixed(4), symbol, verb, tr.price.toFixed(4), true);
 
-        } else {
-            let oldQty = closeQty;
-            let oldAvg = averageClose;
-            let openBeforeThis = entryQty - closeQty;
-            let isFullyClosed = (tr.qty >= openBeforeThis - 0.00000001);
+            copyText += baseCopy + `\n> ${t.avgCopyEntryNew} **${averageEntry.toFixed(8)}**`;
+             let calcStr = `((${oldQty.toFixed(4)} x ${oldAvg.toFixed(4)}) + (${entryAmt.toFixed(4)} x ${tr.price.toFixed(4)})) / ${entryQty.toFixed(4)}`;
+            if (oldQty > 0) copyText += `\n> ${t.avgCalcPrefix} ${calcStr}`;
 
-            closeCost += (tr.qty * tr.price);
-            closeQty += tr.qty;
-            averageClose = closeCost / closeQty;
-            closeFormulaParts.push(`(${tr.qty.toFixed(4)} x ${tr.price.toFixed(4)})`);
-
-            let verb = tr.side === 'BUY' ? t.avgVerbBought : t.avgVerbSold;
+            htmlText += baseHtml + `<div style="margin-top: 8px; color: var(--accent); font-family: monospace; font-size: 12px; opacity: 0.8;">${t.avgCopyEntryNew} <strong>${averageEntry.toFixed(8)}</strong></div>`;
+            if (oldQty > 0) htmlText += `<div style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; font-family: monospace; font-size: 11px; opacity: 0.7;">${t.avgCalcPrefix} <em>${calcStr}</em></div>`;
             
-            let builderFunc = isFullyClosed ? t.avgBuildClosedText : t.avgBuildReducedText;
-            let copyText, htmlText;
-
-            if (Math.abs(oldQty) < 0.00000001) {
-                let baseCopy = builderFunc(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), false);
-                let baseHtml = builderFunc(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), true);
-
-                copyText = baseCopy + `\n> ${t.avgCopyCloseOld} **${averageClose.toFixed(8)}**`;
-                htmlText = baseHtml + `<div style="margin-top: 8px; color: var(--accent-2); font-family: monospace; font-size: 12px; opacity: 0.8;">${t.avgCopyCloseOld} <strong>${averageClose.toFixed(8)}</strong></div>`;
-            } else {
-                let baseCopy = builderFunc(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), false);
-                let baseHtml = builderFunc(posDesc, tr.orderId, tr.qty.toFixed(4), symbol, verb, tr.price.toFixed(4), true);
-
-                copyText = baseCopy + `\n> ${t.avgCopyCloseNew} **${averageClose.toFixed(8)}**`;
-                let calcStr = `((${oldQty.toFixed(4)} x ${oldAvg.toFixed(4)}) + (${tr.qty.toFixed(4)} x ${tr.price.toFixed(4)})) / ${closeQty.toFixed(4)}`;
-                copyText += `\n> ${t.avgCalcPrefix} ${calcStr}`;
-
-                htmlText = baseHtml + `<div style="margin-top: 8px; color: var(--accent-2); font-family: monospace; font-size: 12px; opacity: 0.8;">${t.avgCopyCloseNew} <strong>${averageClose.toFixed(8)}</strong></div>`;
-                htmlText += `<div style="margin-top: 8px; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; font-family: monospace; font-size: 11px; opacity: 0.7;">${t.avgCalcPrefix} <em>${calcStr}</em></div>`;
-            }
-
-            processedList.push({ ...tr, actionType: 'CLOSE', copyText, htmlText });
+            if (!isFlipped) localActionType = 'ENTRY';
         }
+
+        processedList.push({ ...tr, actionType: localActionType, copyText, htmlText });
     }
 
     let finalSummaryCopyText = "";
     let finalSummaryHtmlText = "";
 
-    if (entryFormulaParts.length > 1) {
-        let formulaStr = `${t.avgFormulaEntryTitle}:\n(${entryFormulaParts.join(' + ')}) / ${entryQty.toFixed(4)} = ${averageEntry.toFixed(8)}`;
-        finalSummaryCopyText += `\n\n${'-'.repeat(40)}\n${formulaStr}`;
-        finalSummaryHtmlText += `
-            <div style="margin-top: 16px; padding: 12px; background: rgba(0, 229, 168, 0.05); border-top: 1px solid var(--accent); border-radius: 0 0 8px 8px;">
-                <h4 style="margin: 0 0 8px 0; color: var(--accent); font-size: 13px;">${t.avgFormulaEntryTitle}</h4>
-                <div style="font-family: monospace; font-size: 12px; word-break: break-all; color: var(--muted);">
-                    (${entryFormulaParts.join(' + ')}) / ${entryQty.toFixed(4)} = <strong style="color: var(--accent);">${averageEntry.toFixed(8)}</strong>
-                </div>
-            </div>`;
+    let finalDirection = posDesc;
+    if (modeType === 'BOTH') {
+        if (netPosition > 0.00000001) finalDirection = 'LONG';
+        else if (netPosition < -0.00000001) finalDirection = 'SHORT';
     }
 
-    if (closeFormulaParts.length > 1) {
-        let formulaStr = `${t.avgFormulaCloseTitle}:\n(${closeFormulaParts.join(' + ')}) / ${closeQty.toFixed(4)} = ${averageClose.toFixed(8)}`;
-        finalSummaryCopyText += `\n\n${'-'.repeat(40)}\n${formulaStr}`;
+    // Only add the final active position if there's actually trade data hanging (prevents empty phases from fully-closed tails)
+    if (entryFormulaParts.length > 0 || closeFormulaParts.length > 0) {
+        historicalPositions.push({
+            index: curPosIndex,
+            direction: finalDirection,
+            startDate: phaseStartDate,
+            endDate: consolidatedOrders.length > 0 ? consolidatedOrders[consolidatedOrders.length - 1].date : null,
+            entryFormulaParts: entryFormulaParts,
+            closeFormulaParts: closeFormulaParts,
+            entryOrderIds: entryOrderIds,
+            closeOrderIds: closeOrderIds,
+            entryQty: entryQty,
+            averageEntry: averageEntry,
+            closeQty: closeQty,
+            averageClose: averageClose
+        });
+    }
+
+    for (let pos of historicalPositions) {
+        if (pos.entryFormulaParts.length === 0 && pos.closeFormulaParts.length === 0) continue;
+
+        let needsTitle = historicalPositions.length > 1;
+        let pLabel = `[Phase ${pos.index}] ${pos.direction}`;
+
+        if (needsTitle) {
+            finalSummaryCopyText += `\n\n--- 🔄 ${pLabel} ---`;
+            finalSummaryHtmlText += `
+                <div style="margin-top: 24px; padding: 8px 12px; background: rgba(255,255,255,0.05); border-left: 3px solid #8b5cf6; border-radius: 4px; font-weight: bold; font-family: monospace; font-size: 13px; color: #8b5cf6;">
+                    🔄 ${pLabel}
+                </div>`;
+        }
+
+        // Add the narrative text
+        let isClosed = (pos.index < historicalPositions.length) || (pos.closeQty >= pos.entryQty - 0.000001);
+        let narrText = t.avgPhaseNarration(pos.direction, pos.startDate, pos.endDate, pos.entryOrderIds, pos.closeOrderIds, isClosed, false);
+        let narrHtml = t.avgPhaseNarration(pos.direction, pos.startDate, pos.endDate, pos.entryOrderIds, pos.closeOrderIds, isClosed, true);
+        
+        finalSummaryCopyText += `\n\n${narrText}`;
         finalSummaryHtmlText += `
-            <div style="margin-top: 16px; padding: 12px; background: rgba(59, 130, 246, 0.05); border-top: 1px solid var(--accent-2); border-radius: 0 0 8px 8px;">
-                <h4 style="margin: 0 0 8px 0; color: var(--accent-2); font-size: 13px;">${t.avgFormulaCloseTitle}</h4>
-                <div style="font-family: monospace; font-size: 12px; word-break: break-all; color: var(--muted);">
-                    (${closeFormulaParts.join(' + ')}) / ${closeQty.toFixed(4)} = <strong style="color: var(--accent-2);">${averageClose.toFixed(8)}</strong>
-                </div>
+            <div style="margin-top: 12px; padding: 12px; font-size: 13px; color: rgba(255,255,255,0.85); line-height: 1.5; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                ${narrHtml}
             </div>`;
+
+        if (pos.entryFormulaParts.length > 0) {
+            let formulaStr = `${t.avgFormulaEntryTitle}:\n(${pos.entryFormulaParts.join(' + ')}) / ${pos.entryQty.toFixed(4)} = ${pos.averageEntry.toFixed(8)}`;
+            finalSummaryCopyText += `\n\n${'-'.repeat(40)}\n${formulaStr}`;
+            finalSummaryHtmlText += `
+                <div style="margin-top: 12px; padding: 12px; background: rgba(0, 229, 168, 0.05); border-top: 1px solid var(--accent); border-radius: 0 0 8px 8px;">
+                    <h4 style="margin: 0 0 8px 0; color: var(--accent); font-size: 13px;">${t.avgFormulaEntryTitle}</h4>
+                    <div style="font-family: monospace; font-size: 12px; word-break: break-all; color: var(--muted);">
+                        (${pos.entryFormulaParts.join(' + ')}) / ${pos.entryQty.toFixed(4)} = <strong style="color: var(--accent);">${pos.averageEntry.toFixed(8)}</strong>
+                    </div>
+                </div>`;
+        }
+
+        if (pos.closeFormulaParts.length > 0) {
+            let formulaStr = `${t.avgFormulaCloseTitle}:\n(${pos.closeFormulaParts.join(' + ')}) / ${pos.closeQty.toFixed(4)} = ${pos.averageClose.toFixed(8)}`;
+            finalSummaryCopyText += `\n\n${(pos.entryFormulaParts.length<=0)?'':'-'.repeat(40)+'\n'}${formulaStr}`;
+            finalSummaryHtmlText += `
+                <div style="margin-top: 12px; padding: 12px; background: rgba(59, 130, 246, 0.05); border-top: 1px solid var(--accent-2); border-radius: 0 0 8px 8px;">
+                    <h4 style="margin: 0 0 8px 0; color: var(--accent-2); font-size: 13px;">${t.avgFormulaCloseTitle}</h4>
+                    <div style="font-family: monospace; font-size: 12px; word-break: break-all; color: var(--muted);">
+                        (${pos.closeFormulaParts.join(' + ')}) / ${pos.closeQty.toFixed(4)} = <strong style="color: var(--accent-2);">${pos.averageClose.toFixed(8)}</strong>
+                    </div>
+                </div>`;
+        }
     }
 
     let masterCopyStringPlain = processedList.map(item => `[${item.date}]\n${item.copyText}`).join('\n\n');
@@ -322,6 +470,7 @@ export default function AverageCalculator({ lang, uiStrings }) {
         averageEntry,
         closeQty,
         averageClose,
+        historicalPositions,
         processedList,
         finalSummaryHtmlText,
         masterCopyStringPlain,
@@ -404,18 +553,28 @@ export default function AverageCalculator({ lang, uiStrings }) {
                                       {results.hedgeBadge}
                                   </div>
                                   <div style={{ display: 'flex', gap: '24px' }}>
-                                      <div style={{ textAlign: 'right' }}>
-                                          <div className="label">{t.avgEntry} {results.entryQty.toFixed(4)})</div>
-                                          <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'monospace', color: 'var(--accent)' }}>
-                                              {results.averageEntry > 0 ? results.averageEntry.toFixed(8).replace(/\.?0+$/, '') : '0.00'}
+                                      {results.historicalPositions && results.historicalPositions.length > 1 ? (
+                                          <div style={{ textAlign: 'right', display: 'flex', alignItems: 'center', height: '100%', padding: '4px 0' }}>
+                                              <span style={{ fontSize: '12px', color: 'var(--accent)', fontFamily: 'monospace', opacity: 0.9, background: 'rgba(0, 229, 168, 0.1)', padding: '6px 12px', borderRadius: '4px', border: '1px dashed rgba(0, 229, 168, 0.3)' }}>
+                                                  {t.avgMultiPhaseDetected}
+                                              </span>
                                           </div>
-                                      </div>
-                                      <div style={{ textAlign: 'right' }}>
-                                          <div className="label">{t.avgClose} {results.closeQty.toFixed(4)})</div>
-                                          <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'monospace', color: 'var(--accent-2)' }}>
-                                              {results.averageClose > 0 ? results.averageClose.toFixed(8).replace(/\.?0+$/, '') : '0.00'}
-                                          </div>
-                                      </div>
+                                      ) : (
+                                          <>
+                                              <div style={{ textAlign: 'right' }}>
+                                                  <div className="label">{t.avgEntry} {results.historicalPositions[0]?.entryQty.toFixed(4) || '0.0000'})</div>
+                                                  <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'monospace', color: 'var(--accent)' }}>
+                                                      {results.historicalPositions[0]?.averageEntry > 0 ? results.historicalPositions[0].averageEntry.toFixed(8).replace(/\.?0+$/, '') : '0.00'}
+                                                  </div>
+                                              </div>
+                                              <div style={{ textAlign: 'right' }}>
+                                                  <div className="label">{t.avgClose} {results.historicalPositions[0]?.closeQty.toFixed(4) || '0.0000'})</div>
+                                                  <div style={{ fontSize: '18px', fontWeight: 'bold', fontFamily: 'monospace', color: 'var(--accent-2)' }}>
+                                                      {results.historicalPositions[0]?.averageClose > 0 ? results.historicalPositions[0].averageClose.toFixed(8).replace(/\.?0+$/, '') : '0.00'}
+                                                  </div>
+                                              </div>
+                                          </>
+                                      )}
                                   </div>
                               </div>
                               
@@ -434,7 +593,7 @@ export default function AverageCalculator({ lang, uiStrings }) {
                                       background: 'rgba(0,0,0,0.2)', 
                                       padding: '16px', 
                                       borderRadius: '8px',
-                                      borderLeft: `3px solid ${item.actionType === 'ENTRY' ? 'var(--accent)' : 'var(--accent-2)'}`
+                                      borderLeft: `3px solid ${item.actionType === 'FLIP' ? '#eab308' : (item.actionType === 'ENTRY' ? 'var(--accent)' : 'var(--accent-2)')}`
                                   }}>
                                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                                           <div className="helper" style={{ margin: 0, fontFamily: 'monospace', display: 'flex', gap: '10px', alignItems: 'center' }}>

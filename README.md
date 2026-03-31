@@ -41,7 +41,7 @@ The application is built with a **Stateless Macro Engine** architecture. UI comp
 | `src/pricing.ts` | Centralized data fetching. Handles Exchange 1m OHLC and Precision data. | `Futures FAPI` |
 | `src/components/MacroGenerator.tsx` | The primary interface for generating trade-related macros (TP/SL/Slippage). | `renderMacro`, `pricing.ts` |
 | `src/components/FundingMacro.tsx` | Dedicated UI for complex funding rate calculation macros. | `pricing.ts`, `helpers.ts` |
-| `src/components/AverageCalculator.tsx` | Calculates Position History Open & Close average prices dynamically from copy-pasted Trade History grids. | `locales.ts` |
+| `src/components/AverageCalculator.tsx` | Calculates Position History Open & Close average prices dynamically from copy-pasted Trade History grids. Features a Running Inventory algorithm for precise Position Flip (Long/Short reversal) detection and bilingual reporting. | `locales.ts` |
 | `src/components/LiveTicker.tsx` | Real-time header ticker for key symbols (BTC, ETH, etc.). | `pricing.ts` |
 | `src/macros/index.ts` | Macro Registry. Exports `renderMacro` and maps IDs to functions. | All individual macro files |
 | `src/macros/helpers.ts` | **Critical**: Centralized formatting (fmtNum) and OHLC block builders. | Global |

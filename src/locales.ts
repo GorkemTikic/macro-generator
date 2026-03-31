@@ -121,6 +121,30 @@ export const uiStrings = {
     avgBuildExpandedText: (desc: string, id: string, qty: string, sym: string, verb: string, price: string, isHtml: boolean) => `[**${desc}** Position Expanded] Order ID: ${id} - ${isHtml?'<strong>':'**'}${qty}${isHtml?'</strong>':'**'} amount of ${isHtml?'<strong>':'**'}${sym}${isHtml?'</strong>':'**'} was ${verb} to expand the position at the price of ${isHtml?'<strong>':'**'}${price}${isHtml?'</strong>':'**'}.`,
     avgBuildClosedText: (desc: string, id: string, qty: string, sym: string, verb: string, price: string, isHtml: boolean) => `[**${desc}** Position Closed] Order ID: ${id} - ${isHtml?'<strong>':'**'}${qty}${isHtml?'</strong>':'**'} amount of ${isHtml?'<strong>':'**'}${sym}${isHtml?'</strong>':'**'} was ${verb} to close the position at the price of ${isHtml?'<strong>':'**'}${price}${isHtml?'</strong>':'**'}.`,
     avgBuildReducedText: (desc: string, id: string, qty: string, sym: string, verb: string, price: string, isHtml: boolean) => `[**${desc}** Position Reduced] Order ID: ${id} - ${isHtml?'<strong>':'**'}${qty}${isHtml?'</strong>':'**'} amount of ${isHtml?'<strong>':'**'}${sym}${isHtml?'</strong>':'**'} was ${verb} to reduce the position at the price of ${isHtml?'<strong>':'**'}${price}${isHtml?'</strong>':'**'}.`,
+    avgFlipCopy: (totalAmt: string, closeAmt: string, sym: string, closedSide: string, entryAmt: string, openedSide: string) => `\n> ⚠️ FLIP: This ${totalAmt} ${sym} order closed your ${closeAmt} ${closedSide} position and the remaining ${entryAmt} opened a new ${openedSide} position!`,
+    avgFlipHtml: (totalAmt: string, closeAmt: string, sym: string, closedSide: string, entryAmt: string, openedSide: string) => `
+        <div style="margin-top: 12px; padding: 10px; background: rgba(234, 179, 8, 0.15); border-left: 3px solid #eab308; border-radius: 4px;">
+            <div style="color: #eab308; font-weight: bold; font-size: 11px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                ⚡ FLIP DETECTED
+            </div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.4;">
+                This <strong>${totalAmt} ${sym}</strong> order closed your <strong>${closeAmt}</strong> ${closedSide} position, and the remaining <strong>${entryAmt}</strong> opened a new ${openedSide} position.
+            </div>
+        </div>
+    `,
+    avgMultiPhaseDetected: "🔄 Multi-Position Flow (See explanation below)",
+    avgPhaseNarration: (direction: string, startDate: string, endDate: string, entryIds: string[], closeIds: string[], isClosed: boolean, isHtml: boolean) => {
+        let b = isHtml ? '<strong>' : '**';
+        let bEnd = isHtml ? '</strong>' : '**';
+        let status = isClosed ? `was closed by ${b}${endDate}${bEnd}` : `is currently open`;
+        let s = `This ${b}${direction}${bEnd} position was opened on ${b}${startDate}${bEnd} and ${status}. `;
+        let detail = [];
+        if (entryIds.length > 0) detail.push(`the following ${entryIds.length} order(s) (${entryIds.join(', ')}) expanded it`);
+        if (closeIds.length > 0) detail.push(`the following ${closeIds.length} order(s) (${closeIds.join(', ')}) reduced it`);
+        if (detail.length > 0) s += `Respectively, ${detail.join('; and ')}. `;
+        s += `Based on this activity, the entry and close prices were calculated as follows:`;
+        return s;
+    },
   },
   tr: {
     badge: "Binance 1m OHLC",
@@ -244,5 +268,29 @@ export const uiStrings = {
     avgBuildExpandedText: (desc: string, id: string, qty: string, sym: string, verb: string, price: string, isHtml: boolean) => `[**${desc}** Pozisyon Büyütüldü] Emir ID: ${id} - ${isHtml?'<strong>':'**'}${price}${isHtml?'</strong>':'**'} fiyatından ${isHtml?'<strong>':'**'}${qty}${isHtml?'</strong>':'**'} adet ${isHtml?'<strong>':'**'}${sym}${isHtml?'</strong>':'**'} ${verb} pozisyon büyütüldü.`,
     avgBuildClosedText: (desc: string, id: string, qty: string, sym: string, verb: string, price: string, isHtml: boolean) => `[**${desc}** Pozisyon Kapatıldı] Emir ID: ${id} - ${isHtml?'<strong>':'**'}${price}${isHtml?'</strong>':'**'} fiyatından ${isHtml?'<strong>':'**'}${qty}${isHtml?'</strong>':'**'} adet ${isHtml?'<strong>':'**'}${sym}${isHtml?'</strong>':'**'} ${verb} pozisyon kapatıldı.`,
     avgBuildReducedText: (desc: string, id: string, qty: string, sym: string, verb: string, price: string, isHtml: boolean) => `[**${desc}** Pozisyon Küçültüldü] Emir ID: ${id} - ${isHtml?'<strong>':'**'}${price}${isHtml?'</strong>':'**'} fiyatından ${isHtml?'<strong>':'**'}${qty}${isHtml?'</strong>':'**'} adet ${isHtml?'<strong>':'**'}${sym}${isHtml?'</strong>':'**'} ${verb} pozisyon küçültüldü.`,
+    avgFlipCopy: (totalAmt: string, closeAmt: string, sym: string, closedSide: string, entryAmt: string, openedSide: string) => `\n> ⚠️ YÖN DEĞİŞİMİ (FLIP): Bu ${totalAmt} ${sym} emri ile önce ${closeAmt} büyüklüğündeki ${closedSide} kapatıldı ve kalan ${entryAmt} ile yeni ${openedSide} açıldı!`,
+    avgFlipHtml: (totalAmt: string, closeAmt: string, sym: string, closedSide: string, entryAmt: string, openedSide: string) => `
+        <div style="margin-top: 12px; padding: 10px; background: rgba(234, 179, 8, 0.15); border-left: 3px solid #eab308; border-radius: 4px;">
+            <div style="color: #eab308; font-weight: bold; font-size: 11px; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+                ⚡ YÖN DEĞİŞİMİ (FLIP) TESPİT EDİLDİ
+            </div>
+            <div style="font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.4;">
+                Bu <strong>${totalAmt} ${sym}</strong> büyüklüğündeki tek emir; önce <strong>${closeAmt}</strong> büyüklüğündeki ${closedSide} pozisyonu kapatmış, kalan <strong>${entryAmt}</strong> büyüklüğü ile de yeni ${openedSide} pozisyon açmıştır.
+            </div>
+        </div>
+    `,
+    avgMultiPhaseDetected: "🔄 Çoklu Pozisyon (Aşağıdaki açıklamaları inceleyin)",
+    avgPhaseNarration: (direction: string, startDate: string, endDate: string, entryIds: string[], closeIds: string[], isClosed: boolean, isHtml: boolean) => {
+        let b = isHtml ? '<strong>' : '**';
+        let bEnd = isHtml ? '</strong>' : '**';
+        let status = isClosed ? `${b}${endDate}${bEnd} tarihinde kapatılmıştır` : `şu an hala açıktır`;
+        let s = `${b}${startDate}${bEnd} tarihinde açılan bu ${b}${direction}${bEnd} pozisyonu ${status}. `;
+        let detail = [];
+        if (entryIds.length > 0) detail.push(`sırasıyla şu emirler (${entryIds.join(', ')}) bu pozisyonu büyütmüş`);
+        if (closeIds.length > 0) detail.push(`şu emirler (${closeIds.join(', ')}) pozisyonu küçültmüştür`);
+        if (detail.length > 0) s += `${detail.join(', ve ')}. `;
+        s += `Buna göre pozisyonun detaylı giriş ve çıkış hesaplamaları şu şekildedir:`;
+        return s;
+    },
   }
 };
