@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { downloadAnalyticsWorkbook, type ExportPayload } from '../analytics/exportWorkbook';
 
 const ENDPOINT = (import.meta.env.VITE_ANALYTICS_URL ?? '').replace(/\/$/, '');
 const TOKEN_KEY = '_fd_admin_token';
@@ -76,34 +77,6 @@ function propsStr(raw: string) {
     const o = JSON.parse(raw);
     return Object.entries(o).map(([k, v]) => `${k}=${v}`).join(' · ') || '—';
   } catch { return raw || '—'; }
-}
-
-function downloadCSV(filename: string, headers: string[], rows: string[][]) {
-  const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
-  const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\r\n');
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportEvents(events: EventRow[]) {
-  downloadCSV(
-    `events-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Time (UTC)', 'Event', 'Session ID', 'Device ID', 'Country', 'Tab', 'Props'],
-    events.map(e => [fmtTime(e.ts), e.event_type, e.session_id, e.device_id, e.country, e.tab || '', e.props || ''])
-  );
-}
-
-function exportDevices(devices: DeviceRow[]) {
-  downloadCSV(
-    `devices-${new Date().toISOString().slice(0, 10)}.csv`,
-    ['Device ID', 'Country', 'Sessions', 'Total Events', 'First Seen (UTC)', 'Last Seen (UTC)'],
-    devices.map(d => [d.device_id, d.country, String(d.sessions), String(d.total_events), fmtTime(d.first_seen), fmtTime(d.last_seen)])
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -342,6 +315,7 @@ export default function AdminDashboard() {
   const [deviceEvents,   setDeviceEvents]   = useState<EventRow[]>([]);
   const [loading,     setLoading]     = useState(false);
   const [loadingDevice, setLoadingDevice] = useState(false);
+  const [exporting,   setExporting]   = useState(false);
   const [error,       setError]       = useState('');
   const [activeView,  setActiveView]  = useState<View>('overview');
 
@@ -433,6 +407,26 @@ export default function AdminDashboard() {
     if (v === 'overview' && !stats)              fetchStats(token, range);
   };
 
+  const handleExport = async () => {
+    if (!ENDPOINT || !token) return;
+    setExporting(true); setError('');
+    try {
+      const since = Date.now() - sinceMs(range);
+      const res = await fetch(`${ENDPOINT}/admin/export?since=${since}`, { headers: authHeader(token) });
+      if (res.status === 401) { setError('Invalid admin token.'); setAuthed(false); return; }
+      if (!res.ok) throw new Error(`Export failed: HTTP ${res.status}`);
+      const data = await res.json() as ExportPayload;
+      const label = RANGES.find(r => r.key === range)?.label ?? range;
+      const sinceStr = new Date(since).toISOString().slice(0, 10);
+      const untilStr = new Date().toISOString().slice(0, 10);
+      await downloadAnalyticsWorkbook(data, `${label} (${sinceStr} → ${untilStr})`);
+    } catch (e: any) {
+      setError(e.message || 'Export failed.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const handleSelectDevice = (id: string) => {
     if (selectedDevice === id) { setSelectedDevice(null); setDeviceEvents([]); return; }
     setSelectedDevice(id);
@@ -489,6 +483,15 @@ export default function AdminDashboard() {
             else if (activeView === 'devices') fetchDevices(token, range);
             else                               fetchStats(token, range);
           }} disabled={loading}>{loading ? '…' : '↻ Refresh'}</button>
+          <button
+            className="btn-primary"
+            onClick={handleExport}
+            disabled={exporting || !authed}
+            title="Download a polished Excel workbook with Summary, Device Journey, Raw Events, Devices and a Ready-to-Share tab."
+            style={{ fontWeight: 600 }}
+          >
+            {exporting ? 'Building workbook…' : '⬇ Export Workbook (.xlsx)'}
+          </button>
           <button className="btn-logout" onClick={handleLogout}>Logout</button>
         </div>
       </div>
@@ -543,7 +546,7 @@ export default function AdminDashboard() {
               <HBarChart data={stats.fundingSymbols as NameCount[]} keyField="symbol" valueField="count" color="var(--accent)" />
             </Section>
             <Section title="Countries">
-              <HBarChart data={stats.countries as NameCount[]} keyField="country" valueField="sessions" color="#a855f7" />
+              <HBarChart data={stats.countries as unknown as NameCount[]} keyField="country" valueField="sessions" color="#a855f7" />
             </Section>
           </div>
 
@@ -577,12 +580,9 @@ export default function AdminDashboard() {
               onClick={() => fetchEvents(token, range)} disabled={loading}>
               {loading ? 'Loading…' : '↻ Load'}
             </button>
-            {events.length > 0 && (
-              <button className="btn-refresh" style={{ fontSize: 12, padding: '4px 12px' }}
-                onClick={() => exportEvents(events)}>
-                ↓ Export CSV ({events.length})
-              </button>
-            )}
+            <span style={{ fontSize: 11, color: 'var(--muted)' }}>
+              Use “Export Workbook” in the header to download the full dataset for the selected range.
+            </span>
           </div>
           <EventsTable events={events} />
         </Section>
@@ -596,12 +596,6 @@ export default function AdminDashboard() {
               onClick={() => { setSelectedDevice(null); setDeviceEvents([]); fetchDevices(token, range); }} disabled={loading}>
               {loading ? 'Loading…' : '↻ Load'}
             </button>
-            {devices.length > 0 && (
-              <button className="btn-refresh" style={{ fontSize: 12, padding: '4px 12px' }}
-                onClick={() => exportDevices(devices)}>
-                ↓ Export CSV ({devices.length})
-              </button>
-            )}
             <span style={{ fontSize: 11, color: 'var(--muted)' }}>Click a row to see that device's events</span>
           </div>
           <DevicesTable

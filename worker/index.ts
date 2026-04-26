@@ -258,6 +258,70 @@ export default {
       }
 
       // -----------------------------------------------------------------
+      // GET /admin/export  — full data dump for workbook generation
+      // Returns stats + all devices + all events for the selected range
+      // (no 200-row cap; safety bound at 50k events).
+      // -----------------------------------------------------------------
+      if (url.pathname === '/admin/export' && request.method === 'GET') {
+        const eventsCap = Math.min(Number(url.searchParams.get('limit') ?? 50000), 50000);
+
+        const [
+          overview, tabUsage, topMacros, topSymbols, lookupModes,
+          fundingSymbols, countries, daily, errors, todayRow,
+          devices, events,
+        ] = await Promise.all([
+          env.DB.prepare(`
+            SELECT
+              COUNT(*)                    AS total_events,
+              COUNT(DISTINCT session_id)  AS total_sessions,
+              COUNT(DISTINCT device_id)   AS unique_devices,
+              COUNT(DISTINCT ip_hash)     AS unique_ips,
+              COUNT(DISTINCT country)     AS unique_countries
+            FROM events WHERE ts >= ? AND ts <= ?
+          `).bind(since, until).first(),
+          env.DB.prepare(`SELECT tab, COUNT(*) AS count FROM events WHERE tab != '' AND ts >= ? AND ts <= ? GROUP BY tab ORDER BY count DESC`).bind(since, until).all(),
+          env.DB.prepare(`SELECT json_extract(props, '$.macro_type') AS macro_type, COUNT(*) AS count FROM events WHERE event_type = 'macro_generated' AND ts >= ? AND ts <= ? GROUP BY macro_type ORDER BY count DESC LIMIT 20`).bind(since, until).all(),
+          env.DB.prepare(`SELECT json_extract(props, '$.symbol') AS symbol, COUNT(*) AS count FROM events WHERE json_extract(props, '$.symbol') IS NOT NULL AND json_extract(props, '$.symbol') != '' AND ts >= ? AND ts <= ? GROUP BY symbol ORDER BY count DESC LIMIT 20`).bind(since, until).all(),
+          env.DB.prepare(`SELECT json_extract(props, '$.mode') AS mode, COUNT(*) AS count FROM events WHERE event_type = 'lookup_query' AND ts >= ? AND ts <= ? GROUP BY mode ORDER BY count DESC`).bind(since, until).all(),
+          env.DB.prepare(`SELECT json_extract(props, '$.symbol') AS symbol, COUNT(*) AS count FROM events WHERE event_type = 'funding_query' AND ts >= ? AND ts <= ? GROUP BY symbol ORDER BY count DESC LIMIT 20`).bind(since, until).all(),
+          env.DB.prepare(`SELECT country, COUNT(DISTINCT session_id) AS sessions FROM events WHERE country != 'XX' AND ts >= ? AND ts <= ? GROUP BY country ORDER BY sessions DESC LIMIT 50`).bind(since, until).all(),
+          env.DB.prepare(`SELECT date(ts / 1000, 'unixepoch') AS day, COUNT(DISTINCT session_id) AS sessions, COUNT(*) AS events FROM events WHERE ts >= ? AND ts <= ? GROUP BY day ORDER BY day ASC`).bind(since, until).all(),
+          env.DB.prepare(`SELECT event_type, tab, props, ts FROM events WHERE event_type LIKE '%error%' AND ts >= ? AND ts <= ? ORDER BY ts DESC LIMIT 200`).bind(since, until).all(),
+          env.DB.prepare(`SELECT COUNT(DISTINCT session_id) AS today_sessions FROM events WHERE ts >= ?`).bind(now - 86_400_000).first(),
+          env.DB.prepare(`
+            SELECT device_id, country,
+              COUNT(*)                   AS total_events,
+              COUNT(DISTINCT session_id) AS sessions,
+              MIN(ts)                    AS first_seen,
+              MAX(ts)                    AS last_seen
+            FROM events WHERE ts >= ? AND ts <= ?
+            GROUP BY device_id ORDER BY last_seen DESC LIMIT 5000
+          `).bind(since, until).all(),
+          env.DB.prepare(`
+            SELECT id, event_type, session_id, device_id, country, tab, props, ts
+            FROM events WHERE ts >= ? AND ts <= ?
+            ORDER BY device_id ASC, ts ASC LIMIT ?
+          `).bind(since, until, eventsCap).all(),
+        ]);
+
+        return json({
+          range: { since, until },
+          overview,
+          today_sessions: (todayRow as any)?.today_sessions ?? 0,
+          tabUsage:       tabUsage.results,
+          topMacros:      topMacros.results,
+          topSymbols:     topSymbols.results,
+          lookupModes:    lookupModes.results,
+          fundingSymbols: fundingSymbols.results,
+          countries:      countries.results,
+          daily:          daily.results,
+          errors:         errors.results,
+          devices:        devices.results,
+          events:         events.results,
+        }, 200, cors);
+      }
+
+      // -----------------------------------------------------------------
       // GET /admin/events  — recent raw events
       // -----------------------------------------------------------------
       if (url.pathname === '/admin/events' && request.method === 'GET') {
