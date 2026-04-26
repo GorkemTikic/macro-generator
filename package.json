@@ -1,0 +1,25 @@
+{
+  "name": "macro-generator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Binance Futures support macros with Mark/Last OHLC (1m) pulled client-side. Pure frontend, GitHub Pages ready.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && gh-pages -d dist"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.1",
+    "gh-pages": "^6.1.1",
+    "typescript": "^5.9.3",
+    "vite": "^5.4.9"
+  }
+}

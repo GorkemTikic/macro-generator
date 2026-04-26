@@ -1,0 +1,15 @@
+name            = "macro-analytics"
+main            = "index.ts"
+compatibility_date = "2024-09-23"
+
+[[d1_databases]]
+binding       = "DB"
+database_name = "macro-analytics-db"
+database_id   = "6bbdc4cf-6f14-4679-b919-a2513d535684"
+
+# Set secrets via CLI — never commit them:
+#   wrangler secret put ADMIN_TOKEN
+#
+# ALLOWED_ORIGIN: set to your GitHub Pages URL (no trailing slash)
+[vars]
+ALLOWED_ORIGIN = "https://gorkemtikic.github.io"

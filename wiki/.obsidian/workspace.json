@@ -1,0 +1,215 @@
+{
+  "main": {
+    "id": "a26f6b5116239cac",
+    "type": "split",
+    "children": [
+      {
+        "id": "4b725eece2664a2f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "d24d55b9a533640a",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "CLAUDE.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CLAUDE"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "c6779d33e73ef82a",
+    "type": "split",
+    "children": [
+      {
+        "id": "34a04edb8ae065b1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "18d219fa9807af72",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "9c24f0b44004cb7b",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "22b281c564765180",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "1305d4e20c0c1d61",
+    "type": "split",
+    "children": [
+      {
+        "id": "4bbc9e8c63dc17aa",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "946076790eafcdbe",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "entities/locales-ts.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for locales-ts"
+            }
+          },
+          {
+            "id": "14a5b858f447e5ef",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "entities/locales-ts.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from locales-ts"
+            }
+          },
+          {
+            "id": "85b597ac73c02ae4",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "415a102d7092752c",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "72ae3d94c46e0365",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "entities/locales-ts.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of locales-ts"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "d24d55b9a533640a",
+  "lastOpenFiles": [
+    "concepts/stateless-macro-engine.md",
+    "concepts/running-inventory-algorithm.md",
+    "concepts/glassmorphism-design.md",
+    "concepts/binance-fapi-fallback.md",
+    "sources/docs/2026-04-22-env-example.md",
+    "sources/docs/2026-04-22-deployment-guide.md",
+    "entities/vite-config.md",
+    "entities/macros-registry.md",
+    "decisions/language-via-prop-not-context.md",
+    "entities/locales-ts.md",
+    "entities/live-ticker.md",
+    "decisions/vanilla-css-glass.md",
+    "decisions/precision-truncation-not-rounding.md",
+    "decisions/github-pages-deploy.md",
+    "decisions/architecture-stateless-pure-functions.md",
+    "decisions/2026-04-22-vite-dev-proxy-for-cors.md",
+    "decisions/2026-04-22-margin-feature-scope-transfer-in-only.md",
+    "decisions/2026-04-22-localstorage-per-agent-override.md",
+    "decisions/2026-04-22-build-time-api-key.md",
+    "bugs/2026-04-22-misunderstood-restriction-scope.md",
+    "bugs/2026-04-22-npm-wrong-cwd.md",
+    "concepts/mark-vs-last-price.md",
+    "concepts/bilingual-tr-en.md",
+    "bugs/2026-04-22-leaked-api-credentials.md",
+    "bugs/2026-04-22-cors-failed-to-fetch.md",
+    "log.md"
+  ]
+}
