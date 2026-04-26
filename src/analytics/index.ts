@@ -18,6 +18,7 @@ export type EventType =
   | 'lookup_query'
   | 'lookup_error'
   | 'trailing_stop_checked'
+  | 'gap_explainer_checked'
   | 'funding_query'
   | 'funding_error'
   | 'average_calc_run'

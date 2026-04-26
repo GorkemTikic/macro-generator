@@ -6,6 +6,8 @@ import {
   getLastPriceAtSecond,
   findPriceOccurrences,
   checkTrailingStop, // ✅ Added
+  findClosestMiss,
+  analyzeMarkVsLastGap,
 } from "../pricing";
 
 import { useApp } from "../context/AppContext";
@@ -23,6 +25,7 @@ export default function PriceLookup({ lang, uiStrings }) {
   const [activationPrice, setActivationPrice] = useState(""); // ✅ Trailing Stop
   const [callbackRate, setCallbackRate] = useState(""); // ✅ Trailing Stop
   const [direction, setDirection] = useState("short"); // "short" | "long"
+  const [gapTriggerType, setGapTriggerType] = useState(""); // "" | "MARK" | "LAST"
   const [result, setResult] = useState("");
   const [error, setError] = useState("");
 
@@ -120,8 +123,55 @@ export default function PriceLookup({ lang, uiStrings }) {
         const data = await findPriceOccurrences(activeSymbol, from, to, parseFloat(targetPrice), market, finalType);
 
         if (!data || !data.first) {
+          // Closest Miss analysis — instead of a generic "not reached", show
+          // how close the market got and when.
+          const target = parseFloat(targetPrice);
+          const miss = await findClosestMiss(activeSymbol, from, to, target, market, finalType);
           const noReachMsg = t.lookupPriceNotReached.replace("{price}", targetPrice);
-          return setResult(`${t.lookupNotFoundTitle}\n\n${noReachMsg}`);
+
+          if (!miss) {
+            track({
+              event: 'lookup_query',
+              tab: 'lookup',
+              props: { mode: 'findPrice', symbol: activeSymbol, market, price_type: priceType, result_state: 'closest_miss' },
+            });
+            return setResult(`${t.lookupNotFoundTitle}\n\n${noReachMsg}`);
+          }
+
+          const priceTypeLabel = (miss.priceTypeUsed === 'mark') ? 'Mark Price' : 'Last Price';
+          const sideLabel = miss.side === 'high' ? t.closestMissSideHigh : t.closestMissSideLow;
+          const closestStr = String(miss.closestPrice);
+          const distStr = miss.missDistance.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+          const pctStr = miss.missPct.toFixed(4) + '%';
+          // Edge case: hierarchical search in findPriceOccurrences may skip
+          // matches in very long ranges. If the simple range high/low says the
+          // target was technically inside the range, surface that honestly.
+          const reachedHeader = miss.reached
+            ? `⚠️ **${t.closestMissTargetReached}:** ${t.closestMissYes} (approx — exact moment not pinpointed)`
+            : `❌ **${t.closestMissTargetReached}:** ${t.closestMissNo}`;
+
+          let msg = `## ${t.closestMissTitle}\n\n` +
+            `**Symbol:** ${activeSymbol} (${market.toUpperCase()})\n` +
+            `**${lang === 'tr' ? 'Fiyat Tipi' : 'Price Type'}:** ${priceTypeLabel}\n` +
+            `**Period:** ${from} → ${to} UTC+0\n` +
+            `**${lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}:** ${targetPrice}\n\n` +
+            `${reachedHeader}\n\n` +
+            `${t.closestMissClosestPrice}:\n` +
+            `- ${lang === 'tr' ? 'Fiyat' : 'Price'}: **${closestStr}** (${sideLabel})\n` +
+            `- ${t.closestMissTime}: **${miss.closestTime}**\n` +
+            `- ${t.closestMissDistance}: **${distStr}**\n` +
+            `- ${t.closestMissPercent}: **${pctStr}**\n\n` +
+            `--- \n\n` +
+            `### 💡 ${t.closestMissSupportSummary}\n` +
+            `> ${t.closestMissSummaryLine(targetPrice, priceTypeLabel, closestStr, miss.closestTime, distStr, sideLabel)}\n`;
+
+          setResult(msg);
+          track({
+            event: 'lookup_query',
+            tab: 'lookup',
+            props: { mode: 'findPrice', symbol: activeSymbol, market, price_type: priceType, result_state: 'closest_miss' },
+          });
+          return;
         }
 
         const typeLabel = finalType === 'mark' ? 'Mark Price' : 'Last Price';
@@ -145,6 +195,103 @@ export default function PriceLookup({ lang, uiStrings }) {
           }
         }
         setResult(msg);
+        track({
+          event: 'lookup_query',
+          tab: 'lookup',
+          props: { mode: 'findPrice', symbol: activeSymbol, market, price_type: priceType, result_state: 'reached' },
+        });
+        return;
+
+      } else if (mode === "gapExplainer") {
+        if (!from || !to) return setError(errRange);
+        if (market !== "futures") return setError(t.gapExplainerFuturesOnly);
+
+        const targetNum = targetPrice ? parseFloat(targetPrice) : null;
+        const data = await analyzeMarkVsLastGap(activeSymbol, from, to, targetNum);
+        if (!data) return setResult(t.lookupNotFound);
+
+        const fmtNum = (n: number) => Number(n).toString();
+
+        const lastReachedTxt = data.last.reached ? `✅ ${t.closestMissYes}` : `❌ ${t.closestMissNo}`;
+        const markReachedTxt = data.mark.reached ? `✅ ${t.closestMissYes}` : `❌ ${t.closestMissNo}`;
+        const triggerLabel = gapTriggerType || t.gapExplainerTriggerNone;
+
+        let msg = `## ${t.gapExplainerTitle}\n\n` +
+          `**Symbol:** ${activeSymbol} | **Market:** FUTURES\n` +
+          `**Period:** ${from} → ${to} UTC+0\n` +
+          (targetNum != null ? `**${lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}:** ${targetPrice}\n` : '') +
+          `**${t.gapExplainerTriggerType}:** ${triggerLabel}\n\n` +
+          `--- \n\n` +
+          `### ${t.gapExplainerLastPrice}\n` +
+          (targetNum != null ? `- ${t.gapExplainerReachedTarget}: ${lastReachedTxt}\n` : '') +
+          (data.last.firstTouch ? `- ${t.gapExplainerFirstTouch}: **${data.last.firstTouch.fmt}**\n` : '') +
+          (data.last.summary ? `- ${t.gapExplainerClosestHigh}: **${fmtNum(data.last.summary.high)}** (${data.last.summary.highTime})\n` : '') +
+          (data.last.summary ? `- ${t.gapExplainerClosestLow}: **${fmtNum(data.last.summary.low)}** (${data.last.summary.lowTime})\n` : '') +
+          (data.last.miss && !data.last.miss.reached ? `- ${t.closestMissDistance}: **${fmtNum(data.last.miss.missDistance)}**\n` : '') +
+          `\n### ${t.gapExplainerMarkPrice}\n` +
+          (targetNum != null ? `- ${t.gapExplainerReachedTarget}: ${markReachedTxt}\n` : '') +
+          (data.mark.firstTouch ? `- ${t.gapExplainerFirstTouch}: **${data.mark.firstTouch.fmt}**\n` : '') +
+          (data.mark.summary ? `- ${t.gapExplainerClosestHigh}: **${fmtNum(data.mark.summary.high)}** (${data.mark.summary.highTime})\n` : '') +
+          (data.mark.summary ? `- ${t.gapExplainerClosestLow}: **${fmtNum(data.mark.summary.low)}** (${data.mark.summary.lowTime})\n` : '') +
+          (data.mark.miss && !data.mark.miss.reached ? `- ${t.closestMissDistance}: **${fmtNum(data.mark.miss.missDistance)}**\n` : '') +
+          `\n### ${t.gapExplainerLargestGap}\n`;
+
+        if (data.largestGap) {
+          msg += `- ${t.closestMissTime}: **${data.largestGap.fmt}**\n` +
+            `- Last high: **${fmtNum(data.largestGap.lastHigh)}**\n` +
+            `- Mark high: **${fmtNum(data.largestGap.markHigh)}**\n` +
+            `- Last low: **${fmtNum(data.largestGap.lastLow)}**\n` +
+            `- Mark low: **${fmtNum(data.largestGap.markLow)}**\n` +
+            `- Gap: **${fmtNum(data.largestGap.gap)}**\n`;
+        } else {
+          msg += `- ${t.gapExplainerNoGapData}\n`;
+        }
+
+        // Support Summary — basic English / Turkish, explicit on MARK vs LAST.
+        let summary = "";
+        if (targetNum == null) {
+          summary = t.gapExplainerSummaryNoTarget;
+        } else if (data.last.reached && data.mark.reached) {
+          summary = t.gapExplainerSummaryBothReached;
+          if (gapTriggerType === 'LAST') summary += " " + t.gapExplainerSummaryLast;
+        } else if (data.last.reached && !data.mark.reached) {
+          if (gapTriggerType === 'MARK') summary = t.gapExplainerSummaryMark;
+          else if (gapTriggerType === 'LAST') summary = t.gapExplainerSummaryLast;
+          else summary = t.gapExplainerSummaryLastReachedMarkNot;
+        } else if (!data.last.reached && data.mark.reached) {
+          summary = t.gapExplainerSummaryMarkReachedLastNot;
+        } else {
+          summary = t.gapExplainerSummaryNeitherReached;
+        }
+
+        msg += `\n--- \n\n### 💡 ${t.gapExplainerSupportSummary}\n> ${summary}\n`;
+
+        setResult(msg);
+
+        track({
+          event: 'lookup_query',
+          tab: 'lookup',
+          props: {
+            mode: 'gapExplainer',
+            symbol: activeSymbol,
+            market,
+            trigger_type: gapTriggerType || null,
+            has_target: !!targetNum,
+          },
+        });
+        track({
+          event: 'gap_explainer_checked',
+          tab: 'lookup',
+          props: {
+            symbol: activeSymbol,
+            market,
+            trigger_type: gapTriggerType || null,
+            has_target: !!targetNum,
+            last_reached: !!data.last.reached,
+            mark_reached: !!data.mark.reached,
+          },
+        });
+        return;
 
       } else if (mode === "trailing") {
         if (!from || !to) return setError(errRange);
@@ -271,7 +418,7 @@ export default function PriceLookup({ lang, uiStrings }) {
 
       {/* Mode Selection Cards */}
       <label className="label">{t.lookupMode}</label>
-      <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
+      <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr" }}>
         <div
           className={`option-card ${mode === 'trigger' ? 'active' : ''}`}
           onClick={() => setMode('trigger')}
@@ -301,6 +448,12 @@ export default function PriceLookup({ lang, uiStrings }) {
           onClick={() => setMode('last1s')}
         >
           <span>Last 1s</span>
+        </div>
+        <div
+          className={`option-card ${mode === 'gapExplainer' ? 'active' : ''}`}
+          onClick={() => setMode('gapExplainer')}
+        >
+          <span>{t.gapExplainerModeLabel}</span>
         </div>
       </div>
 
@@ -334,7 +487,7 @@ export default function PriceLookup({ lang, uiStrings }) {
           </div>
         )}
 
-        {(mode === "range" || mode === "findPrice" || mode === "trailing") && (
+        {(mode === "range" || mode === "findPrice" || mode === "trailing" || mode === "gapExplainer") && (
           <>
             <div className="col-6">
               <label className="label">{t.lookupFrom}</label>
@@ -380,6 +533,11 @@ export default function PriceLookup({ lang, uiStrings }) {
               value={targetPrice}
               onChange={(e) => setTargetPrice(e.target.value)}
             />
+            <div className="helper" style={{ fontSize: 11, marginTop: 4, color: '#aaa' }}>
+              ℹ️ {lang === 'tr'
+                ? 'Hedef fiyata ulaşılmadıysa, en yakın gözlemlenen fiyat ve sapma otomatik olarak gösterilir.'
+                : 'If the target is not reached, the closest observed price and miss distance are shown automatically.'}
+            </div>
           </div>
         )}
 
@@ -502,6 +660,55 @@ export default function PriceLookup({ lang, uiStrings }) {
                 </div>
               </div>
             )}
+          </>
+        )}
+
+        {mode === "gapExplainer" && (
+          <>
+            <div className="col-12">
+              <div className="helper" style={{ color: '#aaa', fontSize: 11, background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.1)', marginBottom: 8 }}>
+                💡 {t.gapExplainerHelp}
+              </div>
+            </div>
+            <div className="col-6">
+              <label className="label">{t.gapExplainerTargetOptional}</label>
+              <input
+                className="input"
+                type="number"
+                placeholder="e.g. 95000"
+                value={targetPrice}
+                onChange={(e) => setTargetPrice(e.target.value)}
+              />
+            </div>
+            <div className="col-6">
+              <label className="label">{t.gapExplainerTriggerType}</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  className="tab"
+                  style={{ flex: 1, padding: '6px 8px', fontSize: 12, opacity: gapTriggerType === '' ? 1 : 0.6 }}
+                  onClick={() => setGapTriggerType('')}
+                >
+                  {t.gapExplainerTriggerNone}
+                </button>
+                <button
+                  type="button"
+                  className="tab"
+                  style={{ flex: 1, padding: '6px 8px', fontSize: 12, opacity: gapTriggerType === 'MARK' ? 1 : 0.6 }}
+                  onClick={() => setGapTriggerType('MARK')}
+                >
+                  {t.gapExplainerTriggerMark}
+                </button>
+                <button
+                  type="button"
+                  className="tab"
+                  style={{ flex: 1, padding: '6px 8px', fontSize: 12, opacity: gapTriggerType === 'LAST' ? 1 : 0.6 }}
+                  onClick={() => setGapTriggerType('LAST')}
+                >
+                  {t.gapExplainerTriggerLast}
+                </button>
+              </div>
+            </div>
           </>
         )}
 

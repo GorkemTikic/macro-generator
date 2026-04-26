@@ -550,6 +550,163 @@ async function findMatchInAggTrades(symbol, minuteMs, target, market) {
 }
 
 /**
+ * 🎯 Closest Miss analysis for the Find Price flow.
+ * When the target price was NOT reached, returns the closest observed
+ * value (high-side or low-side) along with timing and miss size.
+ *
+ * Reuses getRangeHighLow so no fetch logic is duplicated.
+ */
+export async function findClosestMiss(symbol, fromStr, toStr, targetPrice, market = "futures", priceType = "last") {
+  const range = await getRangeHighLow(symbol, fromStr, toStr, market);
+  if (!range) return null;
+
+  const useMark = market === "futures" && priceType === "mark";
+  const series = useMark ? range.mark : range.last;
+  const isNum = (v) => typeof v === "number" && !isNaN(v);
+  if (!series || !isNum(series.high) || !isNum(series.low)) return null;
+
+  // If target actually fell within the range, it WAS reached — caller should
+  // not show Closest Miss as the main result.
+  const reached = targetPrice >= series.low && targetPrice <= series.high;
+
+  const distHigh = Math.abs(series.high - targetPrice);
+  const distLow = Math.abs(series.low - targetPrice);
+  const useHigh = distHigh <= distLow;
+
+  const closestPrice = useHigh ? series.high : series.low;
+  const closestTime = useHigh ? series.highTime : series.lowTime;
+  const side = useHigh ? "high" : "low";
+  const missDistance = Math.abs(closestPrice - targetPrice);
+  const missPct = targetPrice !== 0 ? (missDistance / Math.abs(targetPrice)) * 100 : 0;
+
+  return {
+    reached,
+    side,
+    closestPrice,
+    closestTime,
+    missDistance,
+    missPct,
+    priceTypeUsed: useMark ? "mark" : "last",
+  };
+}
+
+/**
+ * 🎯 Mark vs Last Gap analysis (Futures only).
+ * Compares Mark Price and Last Price 1m series in a range so an agent
+ * can explain "the chart touched the level but my order didn't trigger".
+ *
+ * - target optional: when provided, reports first touch on each side.
+ * - Computes per-minute gap (|lastHigh - markHigh| + |lastLow - markLow|)
+ *   and returns the single largest gap minute.
+ */
+export async function analyzeMarkVsLastGap(symbol, fromStr, toStr, targetPrice = null) {
+  const startMs = Date.parse(fromStr + "Z");
+  const endMs = Date.parse(toStr + "Z");
+  if (isNaN(startMs) || isNaN(endMs)) throw new Error("Invalid date format.");
+  if (endMs <= startMs) throw new Error("End time must be after start time.");
+
+  const [markCandles, lastCandles] = await Promise.all([
+    fetchAllKlines("mark", symbol, startMs, endMs, "futures", "1m"),
+    fetchAllKlines("last", symbol, startMs, endMs, "futures", "1m"),
+  ]);
+
+  if (!markCandles.length && !lastCandles.length) return null;
+
+  const summarize = (candles) => {
+    if (!candles.length) return null;
+    const highs = candles.map((c) => parseFloat(c[2]));
+    const lows = candles.map((c) => parseFloat(c[3]));
+    const high = Math.max(...highs);
+    const low = Math.min(...lows);
+    const idxH = highs.indexOf(high);
+    const idxL = lows.indexOf(low);
+    return {
+      high,
+      low,
+      highTime: fmtUTC(Number(candles[idxH][0])),
+      lowTime: fmtUTC(Number(candles[idxL][0])),
+    };
+  };
+
+  const firstTouch = (candles, target) => {
+    if (target == null) return null;
+    for (const c of candles) {
+      const h = parseFloat(c[2]);
+      const l = parseFloat(c[3]);
+      if (target >= l && target <= h) {
+        return { ts: Number(c[0]), fmt: fmtUTC(Number(c[0])) };
+      }
+    }
+    return null;
+  };
+
+  const lastSummary = summarize(lastCandles);
+  const markSummary = summarize(markCandles);
+
+  const lastTouch = firstTouch(lastCandles, targetPrice);
+  const markTouch = firstTouch(markCandles, targetPrice);
+
+  // Align candles by open time and find largest gap.
+  const byTimeMark = new Map();
+  for (const c of markCandles) byTimeMark.set(Number(c[0]), c);
+
+  let largestGap = null;
+  for (const lc of lastCandles) {
+    const t = Number(lc[0]);
+    const mc = byTimeMark.get(t);
+    if (!mc) continue;
+    const lastHigh = parseFloat(lc[2]);
+    const lastLow = parseFloat(lc[3]);
+    const markHigh = parseFloat(mc[2]);
+    const markLow = parseFloat(mc[3]);
+    const highGap = Math.abs(lastHigh - markHigh);
+    const lowGap = Math.abs(lastLow - markLow);
+    const gap = Math.max(highGap, lowGap);
+    if (!largestGap || gap > largestGap.gap) {
+      largestGap = {
+        ts: t,
+        fmt: fmtUTC(t),
+        lastHigh, lastLow, markHigh, markLow,
+        gap,
+      };
+    }
+  }
+
+  // Closest miss numbers (high-side / low-side) per series, when target provided
+  const closestMiss = (summary, target) => {
+    if (!summary || target == null) return null;
+    const reached = target >= summary.low && target <= summary.high;
+    if (reached) return { reached: true };
+    const distHigh = Math.abs(summary.high - target);
+    const distLow = Math.abs(summary.low - target);
+    const useHigh = distHigh <= distLow;
+    return {
+      reached: false,
+      side: useHigh ? "high" : "low",
+      closestPrice: useHigh ? summary.high : summary.low,
+      closestTime: useHigh ? summary.highTime : summary.lowTime,
+      missDistance: useHigh ? distHigh : distLow,
+    };
+  };
+
+  return {
+    last: {
+      summary: lastSummary,
+      reached: !!lastTouch,
+      firstTouch: lastTouch,
+      miss: closestMiss(lastSummary, targetPrice),
+    },
+    mark: {
+      summary: markSummary,
+      reached: !!markTouch,
+      firstTouch: markTouch,
+      miss: closestMiss(markSummary, targetPrice),
+    },
+    largestGap,
+  };
+}
+
+/**
  * 🎯 Trailing Stop Simulation (Binance Futures Logic)
  * 1. Wait for Activation Price (if provided)
  * 2. Track Peak (Sell/Short) or Trough (Buy/Long)
