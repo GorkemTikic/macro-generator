@@ -222,6 +222,42 @@ export default {
       }
 
       // -----------------------------------------------------------------
+      // GET /admin/devices  — per-device summary or drill-down events
+      // -----------------------------------------------------------------
+      if (url.pathname === '/admin/devices' && request.method === 'GET') {
+        const deviceId = url.searchParams.get('device_id');
+
+        if (deviceId) {
+          // Drill-down: events for a single device
+          const limit = Math.min(Number(url.searchParams.get('limit') ?? 100), 200);
+          const rows  = await env.DB.prepare(`
+            SELECT id, event_type, session_id, device_id, country, tab, props, ts
+            FROM events
+            WHERE device_id = ? AND ts >= ? AND ts <= ?
+            ORDER BY ts DESC LIMIT ?
+          `).bind(deviceId, since, until, limit).all();
+          return json({ events: rows.results }, 200, cors);
+        }
+
+        // Summary: one row per unique device
+        const rows = await env.DB.prepare(`
+          SELECT
+            device_id,
+            country,
+            COUNT(*)                   AS total_events,
+            COUNT(DISTINCT session_id) AS sessions,
+            MIN(ts)                    AS first_seen,
+            MAX(ts)                    AS last_seen
+          FROM events
+          WHERE ts >= ? AND ts <= ?
+          GROUP BY device_id
+          ORDER BY last_seen DESC
+          LIMIT 200
+        `).bind(since, until).all();
+        return json({ devices: rows.results }, 200, cors);
+      }
+
+      // -----------------------------------------------------------------
       // GET /admin/events  — recent raw events
       // -----------------------------------------------------------------
       if (url.pathname === '/admin/events' && request.method === 'GET') {
