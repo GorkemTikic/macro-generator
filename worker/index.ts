@@ -72,6 +72,64 @@ export default {
     }
 
     // -------------------------------------------------------------------
+    // GET /fapi/*  or  /api/*  — Binance CORS proxy
+    // GitHub Pages cannot reach Binance directly (CORS / region). The
+    // Worker forwards the request to Binance with multi-base fallback
+    // and adds the appropriate CORS headers on the way back.
+    // -------------------------------------------------------------------
+    if (request.method === 'GET' && (url.pathname.startsWith('/fapi/') || url.pathname.startsWith('/api/'))) {
+      const isFapi = url.pathname.startsWith('/fapi/');
+      const upstreamBases = isFapi
+        ? ['https://fapi.binance.com', 'https://fapi1.binance.com', 'https://fapi2.binance.com', 'https://fapi3.binance.com']
+        : ['https://api.binance.com',  'https://api1.binance.com',  'https://api2.binance.com',  'https://api3.binance.com'];
+
+      const tail = url.pathname + url.search;
+      let lastStatus = 0;
+      let lastBody = '';
+
+      for (const base of upstreamBases) {
+        try {
+          const upstream = await fetch(base + tail, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json' },
+            // Don't forward credentials or the browser's Origin.
+            redirect: 'follow',
+          });
+
+          // Hard rate / region blocks — propagate immediately so the client
+          // surfaces them through the existing error path.
+          if (upstream.status === 429 || upstream.status === 418 || upstream.status === 451) {
+            const body = await upstream.text();
+            return new Response(body, {
+              status: upstream.status,
+              headers: { ...cors, 'Content-Type': 'application/json' },
+            });
+          }
+
+          if (upstream.ok) {
+            const body = await upstream.text();
+            return new Response(body, {
+              status: 200,
+              headers: { ...cors, 'Content-Type': 'application/json' },
+            });
+          }
+
+          lastStatus = upstream.status;
+          lastBody = await upstream.text();
+        } catch (e) {
+          lastStatus = 502;
+          lastBody = JSON.stringify({ error: 'upstream_unreachable', base, detail: String(e) });
+          // try next base
+        }
+      }
+
+      return new Response(lastBody || JSON.stringify({ error: 'upstream_failed' }), {
+        status: lastStatus || 502,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // -------------------------------------------------------------------
     // POST /track  — ingest event
     // -------------------------------------------------------------------
     if (request.method === 'POST' && url.pathname === '/track') {

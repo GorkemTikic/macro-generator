@@ -1,7 +1,10 @@
 // src/pricing.js
 
-// Eğer CORS hatası alırsan buraya kendi proxy adresini yazabilirsin
-export const PROXY = "";
+// Production CORS proxy — the analytics Worker also exposes
+// /fapi/* and /api/* routes that forward to Binance with server-side
+// multi-base fallback. Empty string disables the proxy (useful for
+// local dev when Vite's /api-binance proxy is in use).
+export const PROXY = (import.meta as any).env?.VITE_BINANCE_PROXY ?? "https://macro-analytics.grkmtkc94.workers.dev";
 
 // Alternative Binance API Base URLs for fallback
 const F_BASES = [
@@ -60,9 +63,12 @@ function fmtFreq(ms) {
  */
 async function fetchWithFallback(bases, path, kind = "") {
   let lastError = null;
-  for (const base of bases) {
+  // When PROXY is set, all bases collapse into one Worker URL. The Worker
+  // performs its own multi-base fallback server-side, so we only call once.
+  const targets = PROXY ? [PROXY] : bases;
+  for (const base of targets) {
     try {
-      const url = `${PROXY}${base}${path}`;
+      const url = PROXY ? `${PROXY}${path}` : `${base}${path}`;
       const res = await fetch(url);
       if (res.ok) return await res.json();
 
