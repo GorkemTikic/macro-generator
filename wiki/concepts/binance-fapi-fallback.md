@@ -33,7 +33,12 @@ Since these errors will give the same result in mirror, no requests will be wast
 
 ## CORS
 
-This fallback **does not fix the CORS issue** — they all have the same CORS policy. Separate solution for CORS: `PROXY` constant ([[entities/pricing-ts]]) or Vite dev proxy ([[entities/vite-config]]).
+The 4-base fallback **does not fix the CORS issue** — all mirrors share the same CORS policy and the same regional reachability problems on GitHub Pages. Solutions in use:
+
+- **Production**: `PROXY` in [[entities/pricing-ts]] points to the `macro-analytics` Worker, which exposes `/fapi/*` and `/api/*` routes that perform the same multi-base fallback **server-side** and attach CORS headers. See [[decisions/2026-04-27-worker-as-binance-cors-proxy]] and [[bugs/2026-04-27-binance-fapi-cors-on-pages]].
+- **Dev**: Vite dev proxy via `/api-binance` ([[entities/vite-config]]).
+
+When `PROXY` is set, the client's `fetchWithFallback` short-circuits its loop because the Worker handles fallback.
 
 ## COW difference
 
@@ -48,5 +53,8 @@ Endpoint `/sapi/v1/margin/restricted-asset` is **with auth** (X-MBX-APIKEY heade
 - [[entities/pricing-ts]]
 - [[entities/binance-fapi]]
 - [[entities/binance-sapi-margin]]
+- [[entities/analytics-system]] — Worker that hosts the proxy routes
 - [[decisions/2026-04-22-multi-base-fallback]]
+- [[decisions/2026-04-27-worker-as-binance-cors-proxy]]
 - [[bugs/2026-04-22-cors-failed-to-fetch]]
+- [[bugs/2026-04-27-binance-fapi-cors-on-pages]]

@@ -1,31 +1,55 @@
 // Binance Margin Restricted Asset helper
 //
-// Endpoint: GET /sapi/v1/margin/restricted-asset  (MARKET_DATA — requires X-MBX-APIKEY header only)
+// Endpoint: GET /sapi/v1/margin/restricted-asset  (MARKET_DATA — requires X-MBX-APIKEY)
 // Docs: https://developers.binance.com/docs/margin_trading/market-data/Get-Margin-Restricted-Assets
 //
-// The API key is stored in localStorage (client-entered) so it is NOT baked into the
-// GitHub Pages deployment. Each agent enters their own key once.
+// In production the request is routed through the Cloudflare Worker (/sapi/* route) which
+// injects the API key server-side from a Worker secret. The frontend never sends X-MBX-APIKEY
+// to the Worker; no key is baked into the JS bundle for production.
+//
+// In dev, Vite proxies /api-binance/* to api.binance.com, so VITE_BINANCE_API_KEY is still
+// needed locally. Set it in .env.local (never commit that file).
 
 const LS_KEY = "binance_api_key_v1";
 const CACHE_KEY = "margin_restricted_cache_v1";
 const HISTORY_KEY = "margin_restricted_history_v1";
-const CACHE_TTL_MS = 60_000; // 60s — refresh limit to be friendly to rate limits
+const CACHE_TTL_MS = 60_000; // 60s — rate-limit-friendly refresh cap
 
-// Resolve which base URL(s) to call.
-// - Dev: Vite proxies "/api-binance/*" → "https://api.binance.com/*" (bypasses CORS).
-// - Prod: if VITE_MARGIN_PROXY is set (e.g. a Cloudflare Worker URL), use it; otherwise
-//   fall back to the direct api.binance.com hosts (which will fail if CORS blocks).
-const PROD_PROXY = (import.meta.env?.VITE_MARGIN_PROXY || "").trim().replace(/\/$/, "");
+// ---------------------------------------------------------------------------
+// Proxy / base URL resolution
+// ---------------------------------------------------------------------------
+
+// Worker base (VITE_ANALYTICS_URL already set in .env.local and used for analytics;
+// the same Worker now also serves /sapi/* for Margin SAPI). Fall back to legacy
+// VITE_MARGIN_PROXY for backward compatibility.
+const WORKER_URL = (
+  import.meta.env?.VITE_ANALYTICS_URL ||
+  import.meta.env?.VITE_MARGIN_PROXY ||
+  ""
+).trim().replace(/\/$/, "");
+
+// True when the Cloudflare Worker proxy is active. The Worker injects BINANCE_API_KEY
+// server-side, so the frontend must NOT send X-MBX-APIKEY.
+const USE_WORKER_PROXY = !import.meta.env?.DEV && Boolean(WORKER_URL);
+
+// Base(s) for SAPI calls:
+//   dev  → Vite proxy at /api-binance (bypasses CORS; local key still required)
+//   prod with Worker → single Worker URL (handles auth + CORS + fallback internally)
+//   prod fallback → direct api*.binance.com (will fail CORS — only reached if no Worker configured)
 const SAPI_BASES: string[] = import.meta.env?.DEV
   ? ["/api-binance"]
-  : PROD_PROXY
-  ? [PROD_PROXY]
+  : USE_WORKER_PROXY
+  ? [WORKER_URL]
   : [
       "https://api.binance.com",
       "https://api1.binance.com",
       "https://api2.binance.com",
       "https://api3.binance.com",
     ];
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export type RestrictedPayload = {
   openLongRestrictedAsset: string[];
@@ -40,12 +64,27 @@ export type HistoryEntry = {
   removed: { openLong: string[]; maxCollateral: string[] };
 };
 
-// Build-time shared key (baked in for all agents). Supplied via .env.local
-// with VITE_BINANCE_API_KEY=... before `npm run build`. Do NOT commit .env.local.
+// ---------------------------------------------------------------------------
+// API key management
+// ---------------------------------------------------------------------------
+
+// Build-time shared key (for local dev only). Set VITE_BINANCE_API_KEY in .env.local.
+// NOT needed in production when VITE_ANALYTICS_URL is set (Worker injects the key).
 const BUILD_TIME_KEY = (import.meta.env?.VITE_BINANCE_API_KEY || "").trim();
 
+/** True when a key is available on the frontend (build-time or localStorage override). */
 export function hasSharedKey(): boolean {
-  return Boolean(BUILD_TIME_KEY);
+  return USE_WORKER_PROXY || Boolean(BUILD_TIME_KEY);
+}
+
+/** True when a call can succeed without asking the user for a key. */
+export function hasApiKey(): boolean {
+  return USE_WORKER_PROXY || Boolean(getApiKey());
+}
+
+/** True when the Cloudflare Worker proxy is handling auth server-side. */
+export function isUsingWorkerProxy(): boolean {
+  return USE_WORKER_PROXY;
 }
 
 export function getApiKey(): string {
@@ -56,10 +95,6 @@ export function getApiKey(): string {
     /* ignore */
   }
   return BUILD_TIME_KEY;
-}
-
-export function hasApiKey(): boolean {
-  return Boolean(getApiKey());
 }
 
 export function setApiKey(key: string): void {
@@ -74,6 +109,10 @@ export function setApiKey(key: string): void {
 export function clearApiKey(): void {
   setApiKey("");
 }
+
+// ---------------------------------------------------------------------------
+// Cache + history (localStorage)
+// ---------------------------------------------------------------------------
 
 function readCache(): CachedPayload | null {
   try {
@@ -107,9 +146,7 @@ function readHistory(): HistoryEntry[] {
 
 function writeHistory(list: HistoryEntry[]): void {
   try {
-    // cap at 50 entries
-    const trimmed = list.slice(-50);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(trimmed));
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(-50)));
   } catch {
     /* ignore */
   }
@@ -124,13 +161,18 @@ function diff(prev: string[], next: string[]): { added: string[]; removed: strin
   };
 }
 
+// ---------------------------------------------------------------------------
+// Fetch
+// ---------------------------------------------------------------------------
+
 async function fetchOnce(base: string, apiKey: string, signal?: AbortSignal): Promise<RestrictedPayload> {
   const url = `${base}/sapi/v1/margin/restricted-asset`;
-  const res = await fetch(url, {
-    method: "GET",
-    headers: { "X-MBX-APIKEY": apiKey },
-    signal,
-  });
+  const headers: HeadersInit = {};
+  // Only attach key when calling Binance directly (dev Vite proxy or fallback).
+  // When USE_WORKER_PROXY the Worker injects the key server-side.
+  if (apiKey && !USE_WORKER_PROXY) headers["X-MBX-APIKEY"] = apiKey;
+
+  const res = await fetch(url, { method: "GET", headers, signal });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     throw new Error(`HTTP ${res.status}${text ? ` — ${text.slice(0, 200)}` : ""}`);
@@ -149,7 +191,8 @@ export async function fetchRestricted(opts?: { force?: boolean }): Promise<Cache
   }
 
   const key = getApiKey();
-  if (!key) throw new Error("MISSING_API_KEY");
+  // Worker proxy handles auth server-side; skip the key check in that case.
+  if (!key && !USE_WORKER_PROXY) throw new Error("MISSING_API_KEY");
 
   let lastErr: unknown = null;
   for (const base of SAPI_BASES) {
@@ -157,7 +200,6 @@ export async function fetchRestricted(opts?: { force?: boolean }): Promise<Cache
       const data = await fetchOnce(base, key);
       const fresh: CachedPayload = { ...data, fetchedAt: Date.now() };
 
-      // history diff
       if (cached) {
         const oL = diff(cached.openLongRestrictedAsset, fresh.openLongRestrictedAsset);
         const oC = diff(cached.maxCollateralExceededAsset, fresh.maxCollateralExceededAsset);
@@ -189,29 +231,43 @@ export function getCached(): CachedPayload | null {
   return readCache();
 }
 
-// ----- Transfer-in eligibility -----
+// ---------------------------------------------------------------------------
+// Margin Buy (Long) Risk Control — diagnosis
 //
-// The Binance FAQ (dca77ef9...) explains that both lists are about TRANSFERRING AN
-// ASSET IN to the cross-margin account — not about whether you can trade, borrow,
-// or close positions using that asset. Existing balances are not affected.
+// openLongRestrictedAsset:
+//   Binance has activated Margin Buy (Long) Risk Control for this asset during high
+//   volatility. Users CANNOT open new long positions or increase existing long exposure.
+//   Reduce-only: buy market orders are capped at the net liabilities amount.
+//   Net Liabilities = Total Debt + negative balance − Total Asset of that token.
+//   If Net Liabilities ≤ 0, buy orders are rejected entirely.
+//   Close position and repay debt flows remain allowed.
 //
-// - openLongRestrictedAsset: transfers in are blocked because the asset would be
-//   used to open new long-leveraged exposure that Binance is currently capping.
-// - maxCollateralExceededAsset: the asset has hit Binance's platform-wide max
-//   collateral threshold; more of it cannot be brought in as collateral.
+// maxCollateralExceededAsset:
+//   The asset has hit Binance's platform-wide maximum collateral threshold.
+//   No more of it can be brought into the margin account as collateral until the cap
+//   frees up. Existing balances and trading are unaffected.
+//
+// Ref: https://www.binance.com/en/support/faq/detail/0ec778021b7a4f14b1b334f74b764b77
+// ---------------------------------------------------------------------------
 
-const FAQ_URL = "https://www.binance.com/en/support/faq/detail/dca77ef963294b368b5ebad0affeda09";
+const FAQ_URL = "https://www.binance.com/en/support/faq/detail/0ec778021b7a4f14b1b334f74b764b77";
 
-export type TransferDiagnosis = {
+export type AssetRestriction = {
   asset: string;
-  canTransferIn: boolean;
+  /** false = buy-long is restricted (or collateral exceeded) */
+  canBuyLong: boolean;
   reasonCode: "OPEN_LONG_RESTRICTED" | "MAX_COLLATERAL_EXCEEDED" | "BOTH" | "NONE";
   plainEnglish: string;
   customerReply: string;
   faqUrl: string;
+  // kept for backward compat with the UI canTransferIn check
+  canTransferIn: boolean;
 };
 
-export function diagnoseTransfer(asset: string, data: RestrictedPayload): TransferDiagnosis {
+/** @deprecated use AssetRestriction */
+export type TransferDiagnosis = AssetRestriction;
+
+export function diagnoseTransfer(asset: string, data: RestrictedPayload): AssetRestriction {
   const a = asset.trim().toUpperCase();
   const inOpenLong = data.openLongRestrictedAsset.includes(a);
   const inMaxCollat = data.maxCollateralExceededAsset.includes(a);
@@ -219,9 +275,10 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): Transf
   if (!a) {
     return {
       asset: a,
+      canBuyLong: false,
       canTransferIn: false,
       reasonCode: "NONE",
-      plainEnglish: "Enter an asset symbol to check transfer eligibility.",
+      plainEnglish: "Enter an asset symbol to check restriction status.",
       customerReply: "",
       faqUrl: FAQ_URL,
     };
@@ -230,9 +287,14 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): Transf
   if (inOpenLong && inMaxCollat) {
     return {
       asset: a,
+      canBuyLong: false,
       canTransferIn: false,
       reasonCode: "BOTH",
-      plainEnglish: `${a} cannot be transferred into the cross-margin account. It is currently on both Binance's open-long restriction list AND has exceeded the max collateral threshold. Existing ${a} balance in margin can still be traded, borrowed against, or used to close positions — only new transfers in are blocked.`,
+      plainEnglish:
+        `${a} is currently under both Binance Margin Buy (Long) Risk Control AND has exceeded the ` +
+        `maximum collateral threshold. Opening or increasing long positions is restricted — only ` +
+        `reduce-only trades up to net liabilities are allowed. Close position and repay debt flows ` +
+        `are still permitted.`,
       customerReply: buildReply(a, "BOTH"),
       faqUrl: FAQ_URL,
     };
@@ -241,9 +303,15 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): Transf
   if (inOpenLong) {
     return {
       asset: a,
+      canBuyLong: false,
       canTransferIn: false,
       reasonCode: "OPEN_LONG_RESTRICTED",
-      plainEnglish: `${a} cannot be transferred into the cross-margin account right now because it is on Binance's open-long restriction list — i.e. Binance is currently capping new long-leveraged exposure in this asset platform-wide. Your existing ${a} balance in margin is not affected: you can still trade it, borrow against it, or close positions.`,
+      plainEnglish:
+        `${a} is currently under Binance Margin Buy (Long) Risk Control. During high volatility, ` +
+        `Binance has restricted opening new long positions or increasing existing long exposure ` +
+        `in ${a} platform-wide. Buy orders are reduce-only: the maximum buy amount equals the ` +
+        `net liabilities of ${a} (Total Debt − Total Asset). If net liabilities ≤ 0, buy orders ` +
+        `are rejected. Close position and repay debt flows are still allowed.`,
       customerReply: buildReply(a, "OPEN_LONG_RESTRICTED"),
       faqUrl: FAQ_URL,
     };
@@ -252,9 +320,13 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): Transf
   if (inMaxCollat) {
     return {
       asset: a,
+      canBuyLong: true,
       canTransferIn: false,
       reasonCode: "MAX_COLLATERAL_EXCEEDED",
-      plainEnglish: `${a} cannot be transferred into the cross-margin account right now because it has reached Binance's maximum collateral threshold platform-wide. Your existing ${a} balance in margin still functions as collateral and can still be traded or borrowed against — only new transfers in are blocked until the cap frees up.`,
+      plainEnglish:
+        `${a} has reached Binance's platform-wide maximum collateral threshold. No additional ` +
+        `${a} can be transferred into the cross-margin account as collateral until the cap frees ` +
+        `up. Existing ${a} balance, trading, and borrowing are unaffected.`,
       customerReply: buildReply(a, "MAX_COLLATERAL_EXCEEDED"),
       faqUrl: FAQ_URL,
     };
@@ -262,29 +334,59 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): Transf
 
   return {
     asset: a,
+    canBuyLong: true,
     canTransferIn: true,
     reasonCode: "NONE",
-    plainEnglish: `${a} can be transferred into the cross-margin account. It is not on either Binance restriction list at this time.`,
+    plainEnglish: `${a} has no active Binance Margin restrictions at this time. Long positions and collateral transfers are allowed.`,
     customerReply: "",
     faqUrl: FAQ_URL,
   };
 }
 
 function buildReply(asset: string, code: "OPEN_LONG_RESTRICTED" | "MAX_COLLATERAL_EXCEEDED" | "BOTH"): string {
-  const intro = `Thanks for reaching out. The reason you can't transfer ${asset} into your cross-margin account right now is a platform-wide restriction from Binance — not something specific to your account.`;
-  let body = "";
   if (code === "OPEN_LONG_RESTRICTED") {
-    body = ` ${asset} is currently on Binance's open-long restriction list, which temporarily caps new long-leveraged exposure in this asset across all users. Your existing ${asset} balance in margin is not affected: you can still trade it, close positions, or borrow against it — only new transfers in are blocked.`;
-  } else if (code === "MAX_COLLATERAL_EXCEEDED") {
-    body = ` ${asset} has reached Binance's maximum collateral threshold platform-wide, so no more ${asset} can be brought in as collateral until the cap frees up. Your existing ${asset} balance in margin still works normally — you can still trade, borrow against it, or close positions. Only new transfers in are blocked.`;
-  } else {
-    body = ` ${asset} is currently on both Binance's open-long restriction list and has exceeded the max collateral threshold, so new transfers in are blocked. Your existing ${asset} balance in margin still works normally.`;
+    return (
+      `Thanks for reaching out. ${asset} is currently under Binance Margin Buy (Long) Risk Control — ` +
+      `this is a platform-wide measure triggered during high volatility and is not specific to your account.\n\n` +
+      `What this means:\n` +
+      `• Opening new long positions or increasing existing long exposure in ${asset} is restricted.\n` +
+      `• Buy market orders are capped at your net liabilities amount ` +
+      `(Total Debt of ${asset} − Total Asset of ${asset}). If your net liabilities are 0 or negative, ` +
+      `buy orders will be rejected.\n` +
+      `• Close position (sell / reduce long) and repay debt flows are still fully allowed.\n\n` +
+      `This restriction is temporary and will be lifted once Binance determines that market conditions ` +
+      `have stabilised. More info: ${FAQ_URL}`
+    );
   }
-  const outro = ` More info: ${FAQ_URL}. In the meantime you can either wait for Binance to lift the restriction, or use a different asset for the transfer.`;
-  return intro + body + outro;
+  if (code === "MAX_COLLATERAL_EXCEEDED") {
+    return (
+      `Thanks for reaching out. ${asset} has reached Binance's platform-wide maximum collateral ` +
+      `threshold — this is not specific to your account.\n\n` +
+      `What this means:\n` +
+      `• No additional ${asset} can be transferred into the cross-margin account as collateral until ` +
+      `the platform-wide cap frees up.\n` +
+      `• Your existing ${asset} balance in margin still functions normally: trading, borrowing, and ` +
+      `closing positions are unaffected.\n\n` +
+      `You can wait for Binance to lift the cap, or use a different asset for your transfer. ` +
+      `More info: ${FAQ_URL}`
+    );
+  }
+  // BOTH
+  return (
+    `Thanks for reaching out. ${asset} is currently under both Binance Margin Buy (Long) Risk Control ` +
+    `AND has exceeded the maximum collateral threshold — these are platform-wide restrictions.\n\n` +
+    `What this means:\n` +
+    `• Opening or increasing long positions in ${asset} is restricted (reduce-only, capped at net liabilities).\n` +
+    `• No additional ${asset} can be transferred in as collateral.\n` +
+    `• Close position and repay debt are still allowed.\n\n` +
+    `More info: ${FAQ_URL}`
+  );
 }
 
-// Kept for the Full List / Asset badge view.
+// ---------------------------------------------------------------------------
+// Asset badge helper (Full List view)
+// ---------------------------------------------------------------------------
+
 export type AssetStatus = {
   asset: string;
   openLongRestricted: boolean;

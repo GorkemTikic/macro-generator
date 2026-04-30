@@ -14,7 +14,7 @@ export const uiStrings = {
     copy: "Copy",
     copied: "Copied! (Markdown-ready for chat)",
     error: "Error:",
-    errorTip: "Tip: If you see 451 or CORS errors, set a corporate CORS proxy in src/pricing.js (PROXY constant).",
+    errorTip: "Tip: If you see 451 or CORS errors, set VITE_BINANCE_PROXY in your .env to a CORS-enabled proxy URL (the bundled Cloudflare Worker is the default).",
     resultLabel: "Result",
     // Price Lookup
     lookupTitle: "Price Lookup Tool",
@@ -202,7 +202,7 @@ export const uiStrings = {
     copy: "Kopyala",
     copied: "Kopyalandı! (Sohbete hazır)",
     error: "Hata:",
-    errorTip: "İpucu: 451 veya CORS hatası alırsanız, src/pricing.js dosyasındaki PROXY sabitine bir proxy adresi girin.",
+    errorTip: "İpucu: 451 veya CORS hatası alırsanız, .env dosyanızdaki VITE_BINANCE_PROXY değerini CORS uyumlu bir proxy URL'ine ayarlayın (varsayılan olarak gömülü Cloudflare Worker kullanılır).",
     resultLabel: "Sonuç",
     // Price Lookup
     lookupTitle: "Fiyat Sorgulama Aracı",
@@ -317,7 +317,7 @@ export const uiStrings = {
     trailingAgentInternalDescLong: "LONG (Alış) Trailing Stop'ta en düşük seviyeyi (Dip) takip ederiz. Tetiklenme, fiyatın bu dipten seçilen oran kadar YUKARI fırlamasıyla gerçekleşir.",
     trailingAgentInternalDescShort: "SHORT (Satış) Trailing Stop'ta en yüksek seviyeyi (Zirve) takip ederiz. Tetiklenme, fiyatın bu zirveden seçilen oran kadar AŞAĞI düşmesiyle gerçekleşir.",
     // Average Calculator
-    tabAverage: "Position History Open & Close Price Calc.",
+    tabAverage: "Pozisyon Geçmişi Ort. Giriş & Çıkış Fiyatı",
     avgInputTitle: "İŞLEM GEÇMİŞİ GİRİŞİ",
     avgInputSub: "VERİ PANOSU",
     avgClearBtn: "VERİLERİ TEMİZLE",

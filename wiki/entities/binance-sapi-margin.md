@@ -33,12 +33,13 @@ First attempt tried `/sapi/v1/margin/restricted-assets` (plural) → 404. The co
 
 Two separate lists — the UI shows this as two sections.
 
-## CORS issue
+## CORS issue — resolution (2026-04-30)
 
-The browser cannot make a cross-origin request directly to `api.binance.com` with the `X-MBX-APIKEY` header. Solutions:
+The browser cannot call `api.binance.com/sapi/*` with `X-MBX-APIKEY` cross-origin — Binance does not return the needed CORS headers for this header.
 
-- **Dev**: [[entities/vite-config]] proxy `/api-binance` → forwards
-- **Prod (GitHub Pages static)**: `VITE_MARGIN_PROXY` env var → Cloudflare Worker
+Current solution:
+- **Dev**: Vite proxy `/api-binance` → `api.binance.com` (CORS bypassed server-side). `VITE_BINANCE_API_KEY` is sent by the browser through the proxy.
+- **Prod**: The `macro-analytics` Cloudflare Worker exposes a `/sapi/*` route. The Worker injects `BINANCE_API_KEY` (a Worker secret) and forwards to `api.binance.com`. The frontend sends **no** `X-MBX-APIKEY` header to the Worker. `VITE_ANALYTICS_URL` is the Worker base URL; no separate `VITE_MARGIN_PROXY` needed. See [[decisions/2026-04-27-worker-as-binance-cors-proxy]] (now extended to SAPI).
 
 ## Known side endpoints (tried, not used)
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Permanent information archive that captures the macro-generator web application's development process, architectural decisions, and lessons learned.
+Permanent knowledge archive for the `macro-generator` project. It captures durable product knowledge: architecture, file responsibilities, decisions, bugs, and session-level changes worth preserving.
 
 ## Language
 
@@ -70,8 +70,8 @@ When a new source (JSONL transcript, document, note) is added:
    - Decisions taken
    - Issues and bugs identified
    - Open topics / TODOs
-3. Show me a 5-item summary and ask for confirmation.
-4. After confirmation, write:
+3. Show a 5-item summary and ask for confirmation when running a manual ingest.
+4. After confirmation, write only the durable pages that are actually needed:
    - `sources/sessions/YYYY-MM-DD-<slug>.md` - summary page
    - `entities/<entity-name>.md` for each entity (create if absent, update if present)
    - `decisions/YYYY-MM-DD-<decision-slug>.md` for each decision
@@ -86,14 +86,16 @@ When a new source (JSONL transcript, document, note) is added:
 
 ## Workflow: QUERY
 
-To answer questions using the wiki:
+To answer questions using the wiki efficiently:
 
 1. Read `index.md` and identify the relevant categories.
-2. Find and read the relevant pages under `sources/`, `entities/`, `concepts/`, `decisions/`, and `syntheses/`.
-3. Synthesize the answer and provide source references for each important claim.
-4. If the answer introduces a new synthesis or concept, file it back under `syntheses/` or `concepts/`.
-5. Add an entry to `log.md`: `## [YYYY-MM-DD] query | <short question summary>`
-6. List the pages that were created or updated.
+2. Read only the smallest relevant set of pages under `sources/`, `entities/`, `concepts/`, `decisions/`, and `syntheses/`.
+3. Verify important claims against the live repository before editing code or docs.
+4. Synthesize the answer and provide source references for each important claim.
+5. Only create a new `syntheses/` or `concepts/` page when the insight is durable and likely to help future sessions.
+6. If vault content conflicts with the codebase, update the vault after verification.
+7. Add an entry to `log.md`: `## [YYYY-MM-DD] query | <short question summary>`
+8. List the pages that were created or updated.
 
 ---
 
@@ -123,22 +125,8 @@ Add an entry to `log.md`: `## [YYYY-MM-DD] lint | N findings`
 
 ---
 
-## Available Sources
+## Current Repository Notes
 
-There are **3 JSONL** transcript files in `~/.claude/projects/C--Users-user-Desktop-Macro-App-macro-generator-main/`. Use the INGEST prompt to start the first ingest.
-
----
-
-## Next Step
-
-For the first ingest:
-
-```text
-TARGET: C:/Users/user/Desktop/Macro App/macro-generator-main/macro-generator-main/wiki
-
-I added a new source to the `raw/` folder. Find the most recently modified file (`ls -lt`),
-read it, and process it according to the ingest workflow in `CLAUDE.md`.
-...
-```
-
-Or use the ready-made INGEST prompt in `PROMPTS.md`.
+- This vault already contains ingested session summaries and durable project pages.
+- The app is statically deployed, but production reality now also includes a Cloudflare Worker for analytics/admin APIs and Binance proxying.
+- Treat the vault as a fast map into the repo, not as a substitute for code verification.

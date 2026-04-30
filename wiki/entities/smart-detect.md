@@ -2,13 +2,22 @@
 title: src/macros/smart_detect.ts
 tags: [entity, macro, nlp]
 source: src/macros/smart_detect.ts
-date: 2026-04-25
+date: 2026-04-29
 status: active
 ---
 
-# src/macros/smart_detect.ts (81 satır)
+# src/macros/smart_detect.ts
 
 Keyword-based classifier that **predicts** macro type and tone from user's free text input. Not AI — simple `String.includes` regexes.
+
+## Turkish-aware lowercasing
+
+Input is normalized via `s.toLocaleLowerCase('tr').replace(/ı/g, 'i')` before any `.includes()` check, and every literal goes through the same normalization. This is required because:
+
+- JS's default `toLowerCase()` turns `'I'` into `'i'` (dotted), so all-caps Turkish like `ÇALIŞMADI` would become `çalişmadi` — never matching the literal `çalışmadı` (dotless `ı`).
+- A bare `toLocaleLowerCase('tr')` would over-correct in the other direction (English `'I'` → `'ı'`), breaking literals like `not trigger` and `didn't hit`.
+
+Collapsing `ı` → `i` after the locale-aware lowercasing canonicalizes both sides so the matcher works for any caps-case in either language.
 
 ## API
 
@@ -20,25 +29,26 @@ detectMacro(text): { macroId?, tone?, confidence: number, reason? } | null
 
 | Category | Key words (EN+TR) | macroId | tone |
 |---|---|---|---|
-| Funding | `funding`, `fonlama`, `fee`, `komisyon` | `funding_macro` | — |
-| Stop not triggered | `stop` + (`çalışmadı`/`tetiklenmedi`/`not trigger`/`skipped`), `stopum patlamadı` | `stop_limit_not_triggered` | empathetic |
-| Stop triggered, not filled | `stop` + (`dolmadı`/`not fill`), `limit order not filled` | `stop_limit_not_filled` | professional |
-| Slippage | `slippage`, `kayma`, `farklı fiyat`, `market`+`price`+`high` | `high_frequency_slippage` | direct |
-| Not reached | `fiyat gelmedi`, `not reached`, `didn't hit`, `değmedi` | `limit_order_not_reached` | direct |
+| Funding | `funding`, `fonlama`, `fee`, `komisyon` | — (hint only; user must switch to Funding tab) | — |
+| Stop not triggered | `stop` + (`çalışmadı`/`tetiklenmedi`/`not trigger`/`skipped`), `stopum patlamadı` | `mark_not_reached_user_checked_last` | empathetic |
+| Stop triggered, not filled | `stop` + (`dolmadı`/`not fill`), `limit order not filled` | `stop_limit_mark_price_not_filled` | professional |
+| Slippage | `slippage`, `kayma`, `farklı fiyat`, `market`+`price`+`high` | `tp_slippage_mark_price` | direct |
+| Not reached | `fiyat gelmedi`, `not reached`, `didn't hit`, `değmedi` | `mark_not_reached_user_checked_last` | direct |
 
-## Known inconsistencies
+All `macroId` values now exist in [[entities/macros-registry]]. For Stop-Limit and TP-Slippage the classifier defaults to the **Mark Price** variant; the agent can switch to the Last Price variant in the dropdown if needed.
 
-- The generated `macroId` values ​​(`stop_limit_not_triggered`, `high_frequency_slippage`, `limit_order_not_reached`) do not match the actual IDs in [[entities/macros-registry]] (`stop_market_mark_not_reached` etc.).
+## Funding caveat
 
-> ## CONTRADICTION
-> The `macroId` returned by smart-detect does not exactly match the ids in the MACROS array. This calling party needs to match or smart-detect needs to be updated.
+`funding_macro` is registered in [[entities/macros-registry]] but is **not** listed by `listMacros()` (it lives in the Funding Macro tab, not the Macro Generator dropdown). The classifier therefore returns only a confidence + reason for funding queries and does not change the dropdown selection. The current MacroGenerator UI does not surface that hint — it only displays detections that come with a `macroId`.
 
 ## Sources
 
-<!-- Not discussed directly in sessions -->
+- [[sources/sessions/2026-04-28-end-to-end-audit-pass]] — invalid macro IDs fixed and Turkish-aware lowercasing added.
 
 ## Related
 
 - [[entities/macro-generator-component]] — consumer
 - [[entities/macros-registry]]
 - [[concepts/smart-detect-nlp]]
+- [[bugs/2026-04-28-smart-detect-invalid-macro-ids]]
+- [[bugs/2026-04-29-smart-detect-turkish-caps]]

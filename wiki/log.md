@@ -73,3 +73,60 @@ Format:
 
 ## [2026-04-25] lint | first pass — bulgular lint-report.md'de
 - lint-report.md
+
+## [2026-04-26] ingest | 0a6faf58-analytics-build (944KB JSONL)
+- sources/sessions/2026-04-26-analytics-build.md
+- entities/analytics-system.md (updated: sources + related links)
+- decisions/2026-04-26-cloudflare-workers-d1-analytics-backend.md
+- decisions/2026-04-26-ip-hash-privacy.md
+- decisions/2026-04-26-localstorage-admin-token-gate.md
+- index.md (analytics section + 3 decisions + session + doc)
+- sources/docs/2026-04-26-analytics-setup.md (pre-existing, linked)
+
+## [2026-04-28] ingest | 2026-04-27 price-lookup closest-miss + gap-explainer + worker proxy (in-conversation session)
+- sources/sessions/2026-04-27-price-lookup-closest-miss-gap-explainer.md (new)
+- decisions/2026-04-27-worker-as-binance-cors-proxy.md (new)
+- decisions/2026-04-27-gap-explainer-checked-event.md (new)
+- bugs/2026-04-27-binance-fapi-cors-on-pages.md (new — fixed)
+- entities/price-lookup.md (updated — gapExplainer mode, Closest Miss, analytics)
+- entities/pricing-ts.md (updated — findClosestMiss, analyzeMarkVsLastGap, PROXY default to Worker)
+- entities/analytics-system.md (updated — gap_explainer_checked event, /fapi/* + /api/* Worker routes, lookup_query schema extension)
+- concepts/binance-fapi-fallback.md (updated — CORS section now points to Worker proxy)
+- concepts/mark-vs-last-price.md (updated — Gap Explainer is the agent-facing surface)
+- index.md (added session, decisions, bug entry)
+
+## [2026-04-26] ingest | analytics-workbook-export (in-conversation session)
+- sources/sessions/2026-04-26-analytics-workbook-export.md
+- entities/export-workbook.md (new — ExcelJS workbook builder, /admin/export endpoint)
+- entities/analytics-dashboard-guide.md (new — leadership PDF + generation pipeline)
+- entities/analytics-system.md (updated — added /admin/export, /admin/devices, workbook + PDF cross-links, full admin API surface table)
+- decisions/2026-04-26-xlsx-workbook-over-csv.md
+- decisions/2026-04-26-admin-export-endpoint.md
+- decisions/2026-04-26-devices-not-users-framing.md
+- decisions/2026-04-26-edge-headless-pdf-pipeline.md
+- index.md (new analytics entities + new decisions section)
+
+## [2026-04-28] audit | end-to-end audit pass; fixed LiveTicker stale closure, AdminDashboard useState→useEffect, and lazy-loaded exceljs
+- src/components/LiveTicker.tsx (prevPrice → useRef)
+- src/components/AdminDashboard.tsx (useState→useEffect; lazy import exportWorkbook)
+- wiki/bugs/2026-04-28-live-ticker-stale-closure.md (new)
+- wiki/decisions/2026-04-28-lazy-load-exceljs.md (new)
+- wiki/index.md (linked new bug + decision)
+
+## [2026-04-28] audit | second-pass audit; fixed smart_detect invalid macro IDs and small locale fixes
+- src/macros/smart_detect.ts (4 macroIds → real registry IDs; funding now hint-only)
+- src/locales.ts (errorTip EN+TR rewritten for VITE_BINANCE_PROXY; TR tabAverage translated)
+- wiki/entities/smart-detect.md (CONTRADICTION resolved, table updated)
+
+## [2026-04-29] audit | third-pass; fixed Turkish caps mojibake-of-logic in smart-detect (toLowerCase mishandles I/İ/ı)
+- src/macros/smart_detect.ts (norm() helper: tr-locale lower + ı→i collapse)
+- wiki/entities/smart-detect.md (added Turkish-aware lowercasing section)
+
+## [2026-04-29] ingest | end-to-end-audit-pass
+- sources/sessions/2026-04-28-end-to-end-audit-pass.md (new)
+- bugs/2026-04-28-smart-detect-invalid-macro-ids.md (new)
+- bugs/2026-04-29-smart-detect-turkish-caps.md (new)
+- entities/smart-detect.md (back-linked to source + bugs)
+- bugs/2026-04-28-live-ticker-stale-closure.md (source frontmatter normalized)
+- decisions/2026-04-28-lazy-load-exceljs.md (source frontmatter normalized)
+- index.md (new source session + 2 new bug links)

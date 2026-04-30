@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useApp } from "../context/AppContext";
 
 export default function LiveTicker() {
     const { activeSymbol } = useApp();
     const [price, setPrice] = useState<string>("---");
-    const [prevPrice, setPrevPrice] = useState<number | null>(null);
     const [color, setColor] = useState<string>("");
+    // Ref so the WebSocket onmessage closure always reads the latest value;
+    // a state-based prevPrice would be captured stale by the closure.
+    const prevPriceRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (!activeSymbol) return;
         setPrice("---");
+        setColor("");
+        prevPriceRef.current = null;
 
         // Using Binance Futures WebSocket
         const ws = new WebSocket(`wss://fstream.binance.com/ws/${activeSymbol.toLowerCase()}@markPrice`);
@@ -21,11 +25,12 @@ export default function LiveTicker() {
                     const current = parseFloat(data.p);
                     setPrice(current.toFixed(2));
 
-                    if (prevPrice !== null) {
-                        if (current > prevPrice) setColor("ticker-up");
-                        else if (current < prevPrice) setColor("ticker-down");
+                    const prev = prevPriceRef.current;
+                    if (prev !== null) {
+                        if (current > prev) setColor("ticker-up");
+                        else if (current < prev) setColor("ticker-down");
                     }
-                    setPrevPrice(current);
+                    prevPriceRef.current = current;
                 }
             } catch (e) {
                 console.error("Ticker Parse Error", e);

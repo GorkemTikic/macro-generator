@@ -9,6 +9,7 @@ database_id   = "6bbdc4cf-6f14-4679-b919-a2513d535684"
 
 # Set secrets via CLI — never commit them:
 #   wrangler secret put ADMIN_TOKEN
+#   wrangler secret put BINANCE_API_KEY   ← read-only MARKET_DATA key for /sapi/* proxy
 #
 # ALLOWED_ORIGIN: set to your GitHub Pages URL (no trailing slash)
 [vars]

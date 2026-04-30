@@ -1,5 +1,7 @@
-import React, { useState, useCallback } from 'react';
-import { downloadAnalyticsWorkbook, type ExportPayload } from '../analytics/exportWorkbook';
+import React, { useState, useCallback, useEffect } from 'react';
+// exceljs is heavy (~600 KB). Load it on demand from handleExport instead of
+// pulling it into the main bundle for every page view.
+import type { ExportPayload } from '../analytics/exportWorkbook';
 
 const ENDPOINT = (import.meta.env.VITE_ANALYTICS_URL ?? '').replace(/\/$/, '');
 const TOKEN_KEY = '_fd_admin_token';
@@ -375,7 +377,7 @@ export default function AdminDashboard() {
   }, []);
 
   // Auto-load on mount if token already saved
-  useState(() => { if (token) fetchStats(token, range); });
+  useEffect(() => { if (token) fetchStats(token, range); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleLogin = () => {
     const tok = tokenDraft.trim();
@@ -419,6 +421,7 @@ export default function AdminDashboard() {
       const label = RANGES.find(r => r.key === range)?.label ?? range;
       const sinceStr = new Date(since).toISOString().slice(0, 10);
       const untilStr = new Date().toISOString().slice(0, 10);
+      const { downloadAnalyticsWorkbook } = await import('../analytics/exportWorkbook');
       await downloadAnalyticsWorkbook(data, `${label} (${sinceStr} → ${untilStr})`);
     } catch (e: any) {
       setError(e.message || 'Export failed.');

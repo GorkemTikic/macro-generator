@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FD Macro Generator — Analytics Dashboard Guide</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm; }
+  * { box-sizing: border-box; }
+  html, body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    color: #1f2937;
+    background: #fff;
+    font-size: 11pt;
+    line-height: 1.55;
+    margin: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1, h2, h3, h4 { color: #0f172a; margin: 0; font-weight: 700; }
+  h1 { font-size: 26pt; line-height: 1.15; }
+  h2 { font-size: 17pt; margin-top: 0; }
+  h3 { font-size: 13pt; margin-top: 14pt; margin-bottom: 4pt; color: #0b5fae; }
+  h4 { font-size: 11.5pt; margin-top: 10pt; margin-bottom: 2pt; color: #111827; }
+  p  { margin: 6pt 0; }
+  ul { margin: 4pt 0 8pt 18pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  a  { color: #0b5fae; text-decoration: none; }
+  strong { color: #0f172a; }
+  em { color: #374151; }
+
+  .cover {
+    page-break-after: always;
+    height: 250mm;
+    background: linear-gradient(135deg, #0b1220 0%, #0e2a4d 60%, #0b5fae 100%);
+    color: #fff;
+    padding: 32mm 22mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .cover .eyebrow {
+    font-size: 10pt;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: #7dd3fc;
+    margin-bottom: 8mm;
+  }
+  .cover h1 {
+    color: #fff;
+    font-size: 34pt;
+    line-height: 1.1;
+    max-width: 150mm;
+  }
+  .cover .sub {
+    margin-top: 6mm;
+    font-size: 13pt;
+    color: #cbd5e1;
+    max-width: 160mm;
+  }
+  .cover .meta {
+    font-size: 10pt;
+    color: #94a3b8;
+    border-top: 1px solid rgba(255,255,255,0.15);
+    padding-top: 6mm;
+  }
+  .cover .meta strong { color: #fff; }
+
+  .section { page-break-inside: avoid; margin-bottom: 14pt; }
+  .new-page { page-break-before: always; }
+
+  .lede {
+    background: #f1f5f9;
+    border-left: 4px solid #0b5fae;
+    padding: 10pt 14pt;
+    margin: 10pt 0 14pt;
+    font-size: 11pt;
+    color: #0f172a;
+  }
+
+  .why-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10pt;
+    margin-top: 10pt;
+  }
+  .why-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6pt;
+    padding: 10pt 12pt;
+  }
+  .why-card h4 { color: #0b5fae; margin-top: 0; }
+
+  .tab-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8pt;
+    padding: 14pt 16pt;
+    margin: 10pt 0 14pt;
+    background: #fff;
+    page-break-inside: avoid;
+  }
+  .tab-card .pill {
+    display: inline-block;
+    background: #0b5fae;
+    color: #fff;
+    font-size: 8.5pt;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 2pt 8pt;
+    border-radius: 999px;
+    margin-bottom: 6pt;
+    text-transform: uppercase;
+  }
+  .tab-card.tab-pill-amber .pill { background: #b45309; }
+  .tab-card.tab-pill-green .pill { background: #047857; }
+  .tab-card.tab-pill-purple .pill { background: #6d28d9; }
+  .tab-card.tab-pill-slate .pill { background: #334155; }
+
+  .kv {
+    margin: 6pt 0 0;
+    border-top: 1px dashed #e2e8f0;
+    padding-top: 6pt;
+  }
+  .kv .row { display: flex; gap: 10pt; padding: 2pt 0; }
+  .kv .key { width: 38mm; color: #475569; font-size: 10pt; }
+  .kv .val { flex: 1; color: #0f172a; font-size: 10pt; }
+
+  .quote {
+    font-style: italic;
+    color: #334155;
+    border-left: 3px solid #cbd5e1;
+    padding: 4pt 0 4pt 10pt;
+    margin: 8pt 0;
+  }
+
+  table.workbook {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8pt;
+    font-size: 10pt;
+  }
+  table.workbook th, table.workbook td {
+    border: 1px solid #e2e8f0;
+    padding: 6pt 8pt;
+    vertical-align: top;
+    text-align: left;
+  }
+  table.workbook th {
+    background: #0f172a;
+    color: #fff;
+    font-size: 9.5pt;
+    letter-spacing: 0.5px;
+  }
+  table.workbook tr:nth-child(even) td { background: #f8fafc; }
+
+  .footer-note {
+    margin-top: 14pt;
+    font-size: 9.5pt;
+    color: #64748b;
+    border-top: 1px solid #e2e8f0;
+    padding-top: 6pt;
+  }
+
+  .signoff {
+    margin-top: 20pt;
+    padding: 14pt 16pt;
+    background: #0f172a;
+    color: #f8fafc;
+    border-radius: 8pt;
+  }
+  .signoff h3 { color: #7dd3fc; margin-top: 0; }
+  .signoff p { color: #cbd5e1; }
+
+  figure.shot {
+    margin: 10pt 0 4pt;
+    padding: 0;
+    page-break-inside: avoid;
+  }
+  figure.shot img {
+    width: 100%;
+    display: block;
+    border: 1px solid #cbd5e1;
+    border-radius: 6pt;
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.10);
+  }
+  figure.shot figcaption {
+    font-size: 9.5pt;
+    color: #64748b;
+    margin-top: 4pt;
+    font-style: italic;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<!-- ───────── COVER ───────── -->
+<section class="cover">
+  <div>
+    <div class="eyebrow">Internal · FD / SL Tooling</div>
+    <h1>FD Macro Generator<br/>Analytics Dashboard</h1>
+    <div class="sub">A walkthrough of what I built, why each section exists, and how it helps the team make better decisions — written for leadership review.</div>
+  </div>
+  <div class="meta">
+    Prepared by <strong>Görkem Tikiç</strong> &nbsp;·&nbsp; FD Macro Generator project<br/>
+    Document version 1.0 &nbsp;·&nbsp; April 2026
+  </div>
+</section>
+
+<!-- ───────── WHY I BUILT THIS ───────── -->
+<section class="section">
+  <h2>Why I built this</h2>
+  <div class="lede">
+    The FD Macro Generator started as a tool to standardise the macros our agents send out, but once it was used daily I realised we had no visibility into <em>how</em> it was actually being used. I built this analytics layer so leadership and I can see real adoption, identify which workflows save time, and catch issues before users complain. Everything is privacy-respecting, internal-only, and runs on a free-tier infrastructure that costs us nothing.
+  </div>
+
+  <div class="why-grid">
+    <div class="why-card">
+      <h4>The problem I wanted to solve</h4>
+      <p>Before this, I could not answer simple questions in our weekly meetings: how many people are actually using the tool, which features matter, where are agents getting stuck. I was relying on word-of-mouth feedback, which is not enough to defend or grow an internal tool.</p>
+    </div>
+    <div class="why-card">
+      <h4>What I wanted leadership to see</h4>
+      <p>An honest, evidence-based view of adoption and value. Not vanity metrics, not made-up KPIs — real interactions tied to real workflows, presented in a way that anyone in the room can read in under a minute.</p>
+    </div>
+    <div class="why-card">
+      <h4>What I wanted the team to get</h4>
+      <p>A way to spot which features deserve more polish, which ones are unused (and should be removed or rethought), and which workflows are repeated so often that they justify dedicated automation.</p>
+    </div>
+    <div class="why-card">
+      <h4>What I refused to do</h4>
+      <p>Track personal data, store raw IPs, or ship third-party trackers. The system stores only hashed identifiers, country codes from Cloudflare's edge, and event types — nothing that can identify a specific person.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── DASHBOARD TABS ───────── -->
+<section class="section new-page">
+  <h2>The Admin Dashboard — three operational views</h2>
+  <p>The dashboard lives behind a bearer-token gate (only people with the admin token see it). It has three views, each answering a different management question.</p>
+
+  <!-- OVERVIEW TAB -->
+  <div class="tab-card">
+    <span class="pill">Tab 1 · Overview</span>
+    <h3 style="margin-top:0">"Is the tool being used, and what for?"</h3>
+    <p>This is the page I open first every morning. It is a single-screen health check designed to answer adoption questions in seconds.</p>
+
+    <h4>What you see, top to bottom</h4>
+    <ul>
+      <li><strong>Five headline KPIs</strong> — total events, sessions, unique devices, hashed unique IPs, and country reach. The "Sessions" card also shows today's count so I can immediately see whether the tool is being used right now.</li>
+      <li><strong>Sessions per day chart</strong> — a clear trend bar chart, gap-filled across the selected range so a quiet day shows as zero rather than disappearing. This is how I notice whether usage is growing, plateauing, or dipping.</li>
+      <li><strong>Tab usage</strong> — which areas of the tool people actually open. This is my single most-used signal: it tells me where to invest engineering time.</li>
+      <li><strong>Top symbols, macro types, lookup modes, funding symbols</strong> — what users are actually checking. If "ORCAUSDT" dominates funding queries, that is a real-world signal that we should make funding workflows around that asset frictionless.</li>
+      <li><strong>Country distribution</strong> — confirms the tool is reaching the teams it was built for.</li>
+      <li><strong>Recent errors</strong> — the only place errors surface to me without me asking. If something starts failing in production I see it here before a user reports it.</li>
+    </ul>
+
+    <h4>Why this tab exists</h4>
+    <p>I wanted an "executive at-a-glance" page. If a manager opens the dashboard for ten seconds, they should walk away knowing whether the tool is alive, growing, and free of fires. That is the entire purpose of Overview.</p>
+
+    <div class="kv">
+      <div class="row"><div class="key">Time-range selector</div><div class="val">Today, 7 days, 30 days, 90 days. Every chart and KPI updates instantly.</div></div>
+      <div class="row"><div class="key">Refresh</div><div class="val">Pulls fresh data on demand from the analytics backend.</div></div>
+      <div class="row"><div class="key">Privacy posture</div><div class="val">Country comes from Cloudflare's edge headers; IPs are SHA-256 hashed and truncated before storage.</div></div>
+    </div>
+
+    <figure class="shot">
+      <img src="01-overview.png" alt="Overview tab" />
+      <figcaption>Overview tab — KPIs, daily trend, and feature breakdowns on one screen.</figcaption>
+    </figure>
+  </div>
+
+  <!-- RECENT EVENTS TAB -->
+  <div class="tab-card tab-pill-amber">
+    <span class="pill">Tab 2 · Recent Events</span>
+    <h3 style="margin-top:0">"What just happened in the tool?"</h3>
+    <p>Where Overview answers "is it healthy?", Recent Events answers "what exactly are users doing right now?". This is the operational firehose.</p>
+
+    <h4>What you see</h4>
+    <ul>
+      <li>A timestamped feed of every recorded interaction — page views, tab switches, macro generations, lookups, funding queries, calculator runs, margin views, and errors.</li>
+      <li>Each row shows the tab the user was in, the country, and the parsed properties (the symbol they queried, the macro type they generated, the language they were using, and so on).</li>
+      <li>The view shows the most recent activity first, so a glance tells you whether the tool is currently in use.</li>
+    </ul>
+
+    <h4>Why this tab exists</h4>
+    <p>This is a debugging and verification tool. Two scenarios I built it for:</p>
+    <ul>
+      <li><strong>Sanity-checking new features.</strong> When I ship a new macro type, I open this tab and watch it appear in real activity. If it does not show up, the instrumentation is wrong, or nobody is using it yet — both useful to know.</li>
+      <li><strong>Investigating reports.</strong> When someone says "the tool didn't work for me", this is where I look first. The event stream usually shows me exactly what they did, in what order, and where it broke.</li>
+    </ul>
+    <div class="quote">For deeper analysis I no longer rely on this view — I export the workbook (next section) which contains the full dataset for the selected range, not just the most recent activity.</div>
+
+    <figure class="shot">
+      <img src="02-recent-events.png" alt="Recent Events tab" />
+      <figcaption>Recent Events — every interaction with timestamp, event type, tab, country, and parsed properties.</figcaption>
+    </figure>
+  </div>
+
+  <!-- DEVICES TAB -->
+  <div class="tab-card tab-pill-green">
+    <span class="pill">Tab 3 · Devices</span>
+    <h3 style="margin-top:0">"How many real people are actually using this — and what are they doing?"</h3>
+    <p>Every browser the tool is opened in gets a stable, anonymous identifier stored locally on that device. We do not track names, accounts, or IPs — but we can tell that <em>this same person</em> came back tomorrow, and we can summarise their behaviour without ever knowing who they are.</p>
+
+    <h4>What you see</h4>
+    <ul>
+      <li>One row per unique device, ordered by most recent activity.</li>
+      <li>Per device: country, total sessions, total interactions, and first/last seen timestamps.</li>
+      <li>Click any row and it expands inline to show that device's complete activity timeline — which tab they opened, what they generated, what they looked up, and in what order.</li>
+    </ul>
+
+    <h4>Why this tab exists</h4>
+    <p>This is the tab I am most proud of, because it directly answers the question every manager asks: "are these real users or just one person clicking around?". The answer is now visible in seconds.</p>
+    <ul>
+      <li>It also shows <strong>retention</strong>: if the same device returns over multiple days, the tool is sticky. If devices appear once and never come back, we have an onboarding problem.</li>
+      <li>It shows <strong>engagement depth</strong>: a device with 30 events across 3 sessions is using the tool seriously; one with 1 event in 1 session is just curious.</li>
+    </ul>
+
+    <div class="kv">
+      <div class="row"><div class="key">Honest framing</div><div class="val">I always present "devices" rather than "users", because one person on two browsers will appear as two devices. I would rather under-promise than mislead leadership with an inflated user count.</div></div>
+    </div>
+
+    <figure class="shot">
+      <img src="03-devices.png" alt="Devices tab — summary list" />
+      <figcaption>Devices tab — one row per unique device with country, sessions, total events, and first/last seen.</figcaption>
+    </figure>
+    <figure class="shot">
+      <img src="04-devices-drilldown.png" alt="Devices tab — drill-down" />
+      <figcaption>Click a device row to expand its full activity timeline — exactly which tabs they opened and what they did.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ───────── EXPORT WORKBOOK ───────── -->
+<section class="section new-page">
+  <h2>Export Workbook (.xlsx) — five sheets in one click</h2>
+  <p>The "↓ Export Workbook (.xlsx)" button in the dashboard header generates a fully styled Excel file that contains everything for the selected date range. It is the single artefact I want to bring to leadership meetings instead of screenshots.</p>
+
+  <div class="lede">
+    <strong>Why I replaced the old CSV exports.</strong> The previous version exported two separate raw CSV files — useful for spreadsheets, useless for presenting. The new export is one workbook, professionally styled, with sheets organised from "executive overview" down to "raw audit data". Leadership reads the first sheet; analysts can dig down to the last.
+  </div>
+
+  <table class="workbook">
+    <thead>
+      <tr><th style="width:34mm">Sheet</th><th>What it answers</th><th style="width:48mm">Audience</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Summary</strong></td><td>Headline KPIs, breakdowns by tab/macro/symbol/country, plus a plain-English narrative section.</td><td>Leadership (1-minute read)</td></tr>
+      <tr><td><strong>Device Journey</strong></td><td>Each device's activity timeline, grouped and time-ordered, with technical events translated into human-readable actions.</td><td>Anyone who wants to <em>see</em> how users move through the tool</td></tr>
+      <tr><td><strong>Raw Events</strong></td><td>Flat table of every event with parsed and raw JSON columns. Filterable, frozen header, audit-ready.</td><td>Analysts, debugging</td></tr>
+      <tr><td><strong>Devices</strong></td><td>One row per device with derived metrics: avg events per session, most-used tab, last activity.</td><td>Adoption / retention review</td></tr>
+      <tr><td><strong>Ready to Share</strong></td><td>Pre-written executive summary in business English, populated with the actual numbers from the selected period.</td><td>Weekly FD/SL leadership meetings</td></tr>
+    </tbody>
+  </table>
+
+  <!-- SUMMARY SHEET -->
+  <div class="tab-card">
+    <span class="pill">Sheet 1 · Summary</span>
+    <h3 style="margin-top:0">The one-minute read</h3>
+    <p>Designed so anyone can open the file, glance at the first sheet, and walk away informed.</p>
+    <ul>
+      <li><strong>Headline metrics</strong>: total events, total sessions, estimated users (unique devices), unique hashed IPs, countries reached, sessions in the last 24 hours.</li>
+      <li><strong>Derived ratios</strong> that I find more useful than raw counts: events per session (engagement depth), sessions per device (retention), total errors and error rate (reliability).</li>
+      <li><strong>Six side-by-side breakdowns</strong>: top tabs, top macro types, top symbols, lookup modes, funding symbols, top countries.</li>
+      <li><strong>"In Plain English" section</strong> at the bottom — three to five sentences that explain the numbers without jargon, including an honest caveat about how "users" are estimated from devices.</li>
+    </ul>
+    <p><strong>Why this matters:</strong> I have sat in meetings where people stare at a wall of numbers and disengage. This sheet is built so the numbers <em>tell a story</em>, not the other way around.</p>
+
+    <figure class="shot">
+      <img src="05-workbook-summary.png" alt="Workbook — Summary sheet" />
+      <figcaption>Summary sheet — headline metrics, breakdowns, and a plain-English narrative at the bottom.</figcaption>
+    </figure>
+  </div>
+
+  <!-- DEVICE JOURNEY SHEET -->
+  <div class="tab-card tab-pill-purple">
+    <span class="pill">Sheet 2 · Device Journey</span>
+    <h3 style="margin-top:0">The most important presentation sheet</h3>
+    <p>Each device is rendered as its own grouped block, with a dark separator row that names the device, its country, the number of events, and the time span. Inside the block, every interaction is listed in order with a human-readable label.</p>
+    <ul>
+      <li>Technical event names are translated: <code>macro_generated</code> becomes <em>"Generated macro"</em>, <code>lookup_query</code> becomes <em>"Ran price lookup"</em>, <code>funding_query</code> becomes <em>"Checked funding"</em>, and so on.</li>
+      <li>The "Key Details" column extracts the meaningful pieces from the raw payload (the symbol, the macro type, the language) and presents them as readable text.</li>
+      <li>Tab transitions are shown explicitly (<em>"macros → admin"</em>), so you can literally watch a person navigate the tool.</li>
+    </ul>
+    <p><strong>Why this matters:</strong> when I show this sheet to leadership, the conversation stops being abstract. You can <em>see</em> a real person open the app, switch to the funding tab, check ORCAUSDT in summary mode, then in detail mode, then leave. That is far more convincing than any percentage.</p>
+
+    <figure class="shot">
+      <img src="06-workbook-device-journey.png" alt="Workbook — Device Journey sheet" />
+      <figcaption>Device Journey — each device gets its own grouped block with technical events translated to readable actions.</figcaption>
+    </figure>
+  </div>
+
+  <!-- RAW EVENTS SHEET -->
+  <div class="tab-card tab-pill-amber">
+    <span class="pill">Sheet 3 · Raw Events</span>
+    <h3 style="margin-top:0">The audit trail</h3>
+    <p>A flat table of every event in the selected period — event ID, timestamp, type, tab, country, session and device IDs, plus both a human-readable and a raw-JSON view of the properties.</p>
+    <ul>
+      <li>Frozen header row and Excel filters on every column, so anyone can slice and sort without me being there.</li>
+      <li>Both parsed and raw JSON are kept side by side so that no information is lost in translation.</li>
+    </ul>
+    <p><strong>Why this matters:</strong> if someone in the meeting questions a number on the Summary sheet, I can answer it from this sheet immediately, in the same file, with no follow-up needed. It also serves as a permanent audit record of the period.</p>
+
+    <figure class="shot">
+      <img src="07-workbook-raw-events.png" alt="Workbook — Raw Events sheet" />
+      <figcaption>Raw Events — flat, filterable audit table with parsed and raw JSON columns side by side.</figcaption>
+    </figure>
+  </div>
+
+  <!-- DEVICES SHEET -->
+  <div class="tab-card tab-pill-slate">
+    <span class="pill">Sheet 4 · Devices</span>
+    <h3 style="margin-top:0">Adoption at the device level</h3>
+    <p>One row per device, with the four core metrics (sessions, total events, first/last seen) plus three derived columns I added for management readability:</p>
+    <ul>
+      <li><strong>Average events per session</strong> — engagement depth at the device level.</li>
+      <li><strong>Most-used tab</strong> — what this device cares about most.</li>
+      <li><strong>Last activity</strong> — the human-readable label of the most recent thing they did.</li>
+    </ul>
+    <p><strong>Why this matters:</strong> this sheet exposes long-tail behaviour. If two devices generate 80% of the activity, that is a critical finding — it means the tool is loved by a small group. If activity is evenly distributed, the tool has broad adoption. Both are valid; both should drive different decisions.</p>
+
+    <figure class="shot">
+      <img src="08-workbook-devices.png" alt="Workbook — Devices sheet" />
+      <figcaption>Devices sheet — one row per device with derived metrics like avg events per session and most-used tab.</figcaption>
+    </figure>
+  </div>
+
+  <!-- READY TO SHARE SHEET -->
+  <div class="tab-card tab-pill-green">
+    <span class="pill">Sheet 5 · Ready to Share</span>
+    <h3 style="margin-top:0">The slide I do not have to write</h3>
+    <p>This is a leadership-ready narrative, generated automatically from the actual numbers of the selected period. I built it so that the version of the story I share verbally and the version embedded in the file are the same.</p>
+    <ul>
+      <li><strong>What this tool is used for</strong> — one paragraph, plain English, business framing.</li>
+      <li><strong>Adoption snapshot</strong> — devices, sessions, interactions, country reach, sessions in the last 24 hours.</li>
+      <li><strong>Trend</strong> — usage is automatically labelled growing, stable, or declining based on the first half vs. second half of the period.</li>
+      <li><strong>Most used workflows</strong> — the actual top tabs, macros, and symbols, written into sentences.</li>
+      <li><strong>Behaviour patterns</strong> — average interactions per session, average sessions per device.</li>
+      <li><strong>Business / operational value</strong> — three concrete points on why this tool helps the team.</li>
+      <li><strong>Risks and current limitations</strong> — the error count, the device-vs-user honesty caveat, and the privacy stance.</li>
+    </ul>
+    <p><strong>Why this matters:</strong> I built this so a manager can literally screenshot it and drop it into a deck. The story is consistent, the numbers are real, and the limitations are admitted up-front — which is the only way to build trust in internal metrics.</p>
+
+    <figure class="shot">
+      <img src="09-workbook-ready-to-share.png" alt="Workbook — Ready to Share sheet" />
+      <figcaption>Ready to Share — the executive narrative, populated automatically from the period's actual numbers.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ───────── HOW IT WAS BUILT ───────── -->
+<section class="section new-page">
+  <h2>How this is built — and why it costs us nothing</h2>
+  <p>The whole analytics stack runs on infrastructure that is either free or already paid for, with no vendor lock-in:</p>
+  <ul>
+    <li><strong>Frontend</strong> — the existing FD Macro Generator React app, hosted free on GitHub Pages. The analytics client is a small module that fires events as people use the tool.</li>
+    <li><strong>Backend</strong> — a single Cloudflare Worker (free tier: 100,000 requests/day, far above our usage). It receives events, hashes the IP, reads the country from Cloudflare's edge headers, and writes to storage.</li>
+    <li><strong>Database</strong> — Cloudflare D1 (SQLite at the edge, also free at this scale). Stores event records keyed by anonymous device and session IDs.</li>
+    <li><strong>Admin access</strong> — gated by a bearer token that only I (and anyone I share it with) hold. The admin tab is invisible without it.</li>
+    <li><strong>Workbook generation</strong> — runs entirely in the browser when "Export Workbook" is clicked. No server, no upload, no third party sees the data.</li>
+  </ul>
+
+  <h3>What this means in plain terms</h3>
+  <ul>
+    <li><strong>No recurring cost</strong> at our current and projected usage levels.</li>
+    <li><strong>No third-party tracker</strong> — the data never leaves infrastructure I control.</li>
+    <li><strong>No PII</strong> — we cannot identify a specific person from the stored data, by design.</li>
+    <li><strong>Reproducible</strong> — the entire system is in version control; any future engineer can rebuild it.</li>
+  </ul>
+
+  <div class="signoff">
+    <h3>What I would like leadership to take away</h3>
+    <p>This is not just a chart on a screen. It is a feedback loop that lets us decide where to invest time on the tool, demonstrates the FD/SL team is using a real internal product, and gives you concrete numbers you can defend in any forum. The next versions will add per-feature time-on-task tracking and, if we want it, satisfaction scoring after macro generation — both straightforward to add on top of the foundation that is now in place.</p>
+    <p style="margin-top:10pt;">— <strong>Görkem Tikiç</strong></p>
+  </div>
+
+  <p class="footer-note">FD Macro Generator · Analytics Dashboard Guide · April 2026 · Internal use only.</p>
+</section>
+
+</body>
+</html>

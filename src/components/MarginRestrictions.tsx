@@ -6,11 +6,12 @@ import {
   setApiKey,
   hasSharedKey,
   hasApiKey,
+  isUsingWorkerProxy,
   getCached,
   getHistory,
   diagnoseTransfer,
   type CachedPayload,
-  type TransferDiagnosis,
+  type AssetRestriction,
 } from "../margin/restrictedAssets";
 import { track } from "../analytics";
 
@@ -27,6 +28,7 @@ function fmtTime(ms: number): string {
 
 export default function MarginRestrictions({ lang }: { lang: string }) {
   const isTr = lang === "tr";
+  const workerProxy = isUsingWorkerProxy();
   const [mode, setMode] = useState<Mode>("check");
   const [data, setData] = useState<CachedPayload | null>(() => getCached());
   const [loading, setLoading] = useState(false);
@@ -37,7 +39,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
   const [showKeyPanel, setShowKeyPanel] = useState(() => !hasApiKey());
   const sharedKey = hasSharedKey();
 
-  // Asset input for transfer check
+  // Asset input for restriction check
   const [asset, setAsset] = useState("CHZ");
 
   // List filter
@@ -65,7 +67,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
     }
   };
 
-  // auto-load on mount if a key is present and cache is empty/stale
+  // auto-load on mount if a key is present (or Worker proxy is active) and cache is stale
   useEffect(() => {
     track({ event: 'margin_view', tab: 'margin', props: { has_api_key: hasApiKey() } });
     if (keySaved && (!data || Date.now() - data.fetchedAt > 60_000)) {
@@ -84,7 +86,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
     }
   };
 
-  const diagnosis: TransferDiagnosis | null = useMemo(() => {
+  const diagnosis: AssetRestriction | null = useMemo(() => {
     if (!data || !asset.trim()) return null;
     return diagnoseTransfer(asset, data);
   }, [asset, data]);
@@ -116,7 +118,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
     <div className="panel">
       <h3>{isTr ? "Margin Kısıtlamaları" : "Margin Restrictions"}</h3>
 
-      {/* API key setup — only visible when no key is configured, or user toggles override */}
+      {/* No key configured — only shown when Worker proxy is off and no key available */}
       {!keySaved && !sharedKey && (
         <div
           style={{
@@ -135,6 +137,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
         </div>
       )}
 
+      {/* Shared / Worker key indicator */}
       {sharedKey && !showKeyPanel && (
         <div
           style={{
@@ -146,19 +149,26 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
             marginBottom: 10,
           }}
         >
-          <span>{isTr ? "🔑 Ortak API anahtarı kullanımda." : "🔑 Shared API key in use."}</span>
-          <button
-            type="button"
-            className="tab"
-            style={{ padding: "2px 8px", fontSize: 11, height: "auto" }}
-            onClick={() => setShowKeyPanel(true)}
-          >
-            {isTr ? "Anahtarı Geçersiz Kıl" : "Override Key"}
-          </button>
+          <span>
+            {workerProxy
+              ? (isTr ? "🔑 Sunucu tarafı API anahtarı etkin (Cloudflare Worker)." : "🔑 Server-side API key active (Cloudflare Worker).")
+              : (isTr ? "🔑 Ortak API anahtarı kullanımda." : "🔑 Shared API key in use.")}
+          </span>
+          {/* Only show override when not using Worker proxy — browser-side key is meaningless when Worker handles auth */}
+          {!workerProxy && (
+            <button
+              type="button"
+              className="tab"
+              style={{ padding: "2px 8px", fontSize: 11, height: "auto" }}
+              onClick={() => setShowKeyPanel(true)}
+            >
+              {isTr ? "Anahtarı Geçersiz Kıl" : "Override Key"}
+            </button>
+          )}
         </div>
       )}
 
-      {showKeyPanel && (
+      {showKeyPanel && !workerProxy && (
         <div className="grid" style={{ marginBottom: 10 }}>
           <div className="col-12">
             <label className="label" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -223,10 +233,10 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
             <span>
               {isTr ? "Veri tarihi" : "Data as of"}: <b>{fmtTime(data.fetchedAt)}</b>
               {"  ·  "}
-              {isTr ? "Open-long kısıtlı" : "Open-long restricted"}:{" "}
+              {isTr ? "Buy Long kısıtlı" : "Buy Long restricted"}:{" "}
               <b>{data.openLongRestrictedAsset.length}</b>
               {"  ·  "}
-              {isTr ? "Teminat aşımı" : "Max collateral exceeded"}:{" "}
+              {isTr ? "Teminat limiti aşıldı" : "Max collateral exceeded"}:{" "}
               <b>{data.maxCollateralExceededAsset.length}</b>
             </span>
           ) : (
@@ -242,7 +252,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
       <label className="label">{isTr ? "Mod" : "Mode"}</label>
       <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
         <div className={`option-card ${mode === "check" ? "active" : ""}`} onClick={() => setMode("check")}>
-          <span>{isTr ? "Transfer Kontrolü" : "Transfer Check"}</span>
+          <span>{isTr ? "Kısıtlama Kontrolü" : "Restriction Check"}</span>
         </div>
         <div className={`option-card ${mode === "list" ? "active" : ""}`} onClick={() => setMode("list")}>
           <span>{isTr ? "Tam Liste" : "Full List"}</span>
@@ -252,7 +262,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
         </div>
       </div>
 
-      {/* TRANSFER CHECK */}
+      {/* RESTRICTION CHECK */}
       {mode === "check" && (
         <div className="grid">
           <div className="col-12">
@@ -265,8 +275,8 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
             />
             <div className="helper" style={{ fontSize: 11, marginTop: 4 }}>
               {isTr
-                ? "Kontrol edilen: Bu varlık cross-margin hesabına TRANSFER edilebilir mi? Mevcut bakiyeleri ilgilendirmez."
-                : "Checks whether this asset can be TRANSFERRED into the cross-margin account. Does not affect existing balances."}
+                ? "Binance Margin Alım (Long) Risk Kontrolü: bu varlıkta açık/artan long kısıtı var mı? Pozisyon kapatma ve borç geri ödeme her zaman mümkündür."
+                : "Checks for Binance Margin Buy (Long) Risk Control. Open/increase long may be restricted; close position and repay debt are always allowed."}
             </div>
           </div>
 
@@ -277,20 +287,26 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
                   marginTop: 8,
                   padding: 14,
                   borderRadius: 10,
-                  background: diagnosis.canTransferIn ? "rgba(46,189,133,0.08)" : "rgba(239,68,68,0.08)",
-                  border: "1px solid " + (diagnosis.canTransferIn ? "rgba(46,189,133,0.4)" : "rgba(239,68,68,0.4)"),
+                  background: diagnosis.canBuyLong ? "rgba(46,189,133,0.08)" : "rgba(239,68,68,0.08)",
+                  border: "1px solid " + (diagnosis.canBuyLong ? "rgba(46,189,133,0.4)" : "rgba(239,68,68,0.4)"),
                 }}
               >
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                  {diagnosis.canTransferIn
-                    ? `🟢 ${diagnosis.asset}: ${isTr ? "TRANSFER EDİLEBİLİR" : "TRANSFER IN ALLOWED"}`
-                    : `🔴 ${diagnosis.asset}: ${isTr ? "TRANSFER ENGELLİ" : "TRANSFER IN BLOCKED"} — ${diagnosis.reasonCode}`}
+                  {diagnosis.canBuyLong && diagnosis.canTransferIn
+                    ? `🟢 ${diagnosis.asset}: ${isTr ? "KISITLAMA YOK" : "NO RESTRICTIONS"}`
+                    : diagnosis.reasonCode === "OPEN_LONG_RESTRICTED"
+                    ? `🔴 ${diagnosis.asset}: ${isTr ? "MARGIN ALIM (LONG) KISITLI" : "MARGIN BUY (LONG) RESTRICTED"}`
+                    : diagnosis.reasonCode === "MAX_COLLATERAL_EXCEEDED"
+                    ? `🟡 ${diagnosis.asset}: ${isTr ? "TEMİNAT LİMİTİ AŞILDI" : "MAX COLLATERAL EXCEEDED"}`
+                    : `🔴 ${diagnosis.asset}: ${isTr ? "KISITLAMALAR AKTİF" : "RESTRICTIONS ACTIVE"}`}
                 </div>
-                <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 10 }}>{diagnosis.plainEnglish}</div>
+                <div style={{ fontSize: 13, color: "#cbd5e1", marginBottom: 10, whiteSpace: "pre-wrap" }}>
+                  {diagnosis.plainEnglish}
+                </div>
                 {diagnosis.customerReply && (
                   <>
                     <label className="label">{isTr ? "Müşteri Yanıtı (Kopyala-Yapıştır)" : "Customer Reply (copy-paste)"}</label>
-                    <textarea className="textarea" value={diagnosis.customerReply} readOnly />
+                    <textarea className="textarea" value={diagnosis.customerReply} readOnly rows={10} />
                     <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                       <button className="tab" type="button" onClick={copyReply}>
                         📋 {isTr ? "Yanıtı Kopyala" : "Copy Reply"}
@@ -322,7 +338,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
           </div>
           <div className="col-6">
             <label className="label">
-              🔴 {isTr ? "Transfer engelli (open-long kısıt.)" : "Transfer blocked (open-long restriction)"} ({filteredLists.openLong.length})
+              🔴 {isTr ? "Margin Buy (Long) Kısıtlı" : "Margin Buy (Long) Restricted"} ({filteredLists.openLong.length})
             </label>
             <div
               style={{
@@ -344,7 +360,7 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
           </div>
           <div className="col-6">
             <label className="label">
-              🔴 {isTr ? "Transfer engelli (teminat limiti aşıldı)" : "Transfer blocked (max collateral exceeded)"} ({filteredLists.maxCollat.length})
+              🟡 {isTr ? "Teminat limiti aşıldı" : "Max collateral exceeded"} ({filteredLists.maxCollat.length})
             </label>
             <div
               style={{
@@ -391,16 +407,16 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
               >
                 <div style={{ fontWeight: 700, marginBottom: 6 }}>{fmtTime(h.ts)}</div>
                 {h.added.openLong.length > 0 && (
-                  <div>🔴 +Open-long: <code>{h.added.openLong.join(", ")}</code></div>
+                  <div>🔴 +Buy Long restricted: <code>{h.added.openLong.join(", ")}</code></div>
                 )}
                 {h.removed.openLong.length > 0 && (
-                  <div>🟢 -Open-long: <code>{h.removed.openLong.join(", ")}</code></div>
+                  <div>🟢 -Buy Long restriction lifted: <code>{h.removed.openLong.join(", ")}</code></div>
                 )}
                 {h.added.maxCollateral.length > 0 && (
-                  <div>🔴 +MaxCollateral: <code>{h.added.maxCollateral.join(", ")}</code></div>
+                  <div>🟡 +MaxCollateral: <code>{h.added.maxCollateral.join(", ")}</code></div>
                 )}
                 {h.removed.maxCollateral.length > 0 && (
-                  <div>🟢 -MaxCollateral: <code>{h.removed.maxCollateral.join(", ")}</code></div>
+                  <div>🟢 -MaxCollateral lifted: <code>{h.removed.maxCollateral.join(", ")}</code></div>
                 )}
               </div>
             ))

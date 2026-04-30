@@ -46,9 +46,14 @@ Spot only has Last Price. Returns "N/A" placeholders for `getRangeHighLow(symbol
 
 <!-- Not discussed directly in sessions, from code comments -->
 
+## In the support tool
+
+The [[entities/price-lookup]] **Gap Explainer** mode is the dedicated agent-facing surface for this concept. It compares Mark vs Last over a selected range and produces a basic-English support summary keyed off optional MARK/LAST trigger type — purpose-built for the "the chart touched the level, why didn't my order trigger?" case. See [[sources/sessions/2026-04-27-price-lookup-closest-miss-gap-explainer]].
+
 ## Related
 
 - [[entities/pricing-ts]]
+- [[entities/price-lookup]]
 - [[entities/macros-registry]]
 - [[entities/binance-fapi]]
 - [[entities/live-ticker]]

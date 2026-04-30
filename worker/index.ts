@@ -17,6 +17,7 @@ export interface Env {
   DB: D1Database;
   ADMIN_TOKEN: string;
   ALLOWED_ORIGIN: string;
+  BINANCE_API_KEY?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +70,65 @@ export default {
     // CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: cors });
+    }
+
+    // -------------------------------------------------------------------
+    // GET /sapi/*  — Binance Margin SAPI CORS proxy (API key injected server-side)
+    // The frontend never sends X-MBX-APIKEY; the Worker reads BINANCE_API_KEY from
+    // its secret store and injects it before forwarding to api.binance.com.
+    // -------------------------------------------------------------------
+    if (request.method === 'GET' && url.pathname.startsWith('/sapi/')) {
+      const apiKey = env.BINANCE_API_KEY || '';
+      if (!apiKey) {
+        return json({ error: 'binance_key_not_configured' }, 503, cors);
+      }
+
+      const tail = url.pathname + url.search;
+      const sapiBases = [
+        'https://api.binance.com',
+        'https://api1.binance.com',
+        'https://api2.binance.com',
+        'https://api3.binance.com',
+      ];
+      let lastStatus = 0;
+      let lastBody = '';
+
+      for (const base of sapiBases) {
+        try {
+          const upstream = await fetch(base + tail, {
+            method: 'GET',
+            headers: { 'Accept': 'application/json', 'X-MBX-APIKEY': apiKey },
+            redirect: 'follow',
+          });
+
+          if (upstream.status === 429 || upstream.status === 418 || upstream.status === 451) {
+            const body = await upstream.text();
+            return new Response(body, {
+              status: upstream.status,
+              headers: { ...cors, 'Content-Type': 'application/json' },
+            });
+          }
+
+          if (upstream.ok) {
+            const body = await upstream.text();
+            return new Response(body, {
+              status: 200,
+              headers: { ...cors, 'Content-Type': 'application/json' },
+            });
+          }
+
+          lastStatus = upstream.status;
+          lastBody = await upstream.text();
+        } catch (e) {
+          lastStatus = 502;
+          lastBody = JSON.stringify({ error: 'upstream_unreachable', base, detail: String(e) });
+        }
+      }
+
+      return new Response(lastBody || JSON.stringify({ error: 'upstream_failed' }), {
+        status: lastStatus || 502,
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
     }
 
     // -------------------------------------------------------------------
