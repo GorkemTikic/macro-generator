@@ -1,595 +1,662 @@
 <!doctype html>
-<html lang="tr">
+<html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>FD Macro Generator - Feature Guide</title>
-<style>
-  @page { size: A4; margin: 14mm; }
-  * { box-sizing: border-box; }
-  :root {
-    --ink: #111827;
-    --muted: #64748b;
-    --line: #dbe3ef;
-    --soft: #f8fafc;
-    --blue: #2563eb;
-    --green: #059669;
-    --amber: #b45309;
-    --red: #dc2626;
-    --purple: #7c3aed;
-    --dark: #0f172a;
-  }
-  body {
-    margin: 0;
-    font-family: "Segoe UI", Arial, sans-serif;
-    color: var(--ink);
-    background: white;
-    line-height: 1.45;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  h1, h2, h3, h4 { margin: 0; line-height: 1.15; }
-  h1 { font-size: 36px; color: white; }
-  h2 { font-size: 24px; color: var(--dark); margin-bottom: 10px; }
-  h3 { font-size: 17px; color: var(--dark); margin-bottom: 6px; }
-  h4 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
-  p { margin: 6px 0; }
-  code {
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 12px;
-    background: #eef2ff;
-    color: #3730a3;
-    padding: 1px 5px;
-    border-radius: 4px;
-  }
-  .cover {
-    min-height: 265mm;
-    padding: 34mm 22mm 20mm;
-    background:
-      radial-gradient(circle at 85% 12%, rgba(0, 229, 168, .28), transparent 28%),
-      radial-gradient(circle at 12% 72%, rgba(59, 130, 246, .30), transparent 30%),
-      linear-gradient(135deg, #061118 0%, #0f172a 52%, #123b69 100%);
-    color: white;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    page-break-after: always;
-  }
-  .cover .eyebrow {
-    color: #7dd3fc;
-    letter-spacing: .22em;
-    text-transform: uppercase;
-    font-size: 12px;
-    font-weight: 800;
-    margin-bottom: 12px;
-  }
-  .cover .sub {
-    color: #cbd5e1;
-    font-size: 16px;
-    max-width: 680px;
-    margin-top: 16px;
-  }
-  .cover .meta {
-    color: #94a3b8;
-    border-top: 1px solid rgba(255,255,255,.18);
-    padding-top: 18px;
-    font-size: 12px;
-  }
-  .page {
-    page-break-after: always;
-    padding-bottom: 10px;
-  }
-  .page:last-child { page-break-after: auto; }
-  .lede {
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    border-left: 5px solid var(--blue);
-    padding: 12px 14px;
-    border-radius: 8px;
-    margin: 10px 0 16px;
-  }
-  .mini-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
-    margin-top: 16px;
-  }
-  .mini-card {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--soft);
-    padding: 12px;
-    min-height: 105px;
-  }
-  .mini-card b { display: block; color: var(--dark); margin-bottom: 4px; }
-  .mini-card span { color: var(--muted); font-size: 12px; }
-  .tabs-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 12px 0 16px;
-  }
-  .tab-pill {
-    padding: 7px 11px;
-    border-radius: 8px;
-    background: #1e293b;
-    color: #dbeafe;
-    font-size: 12px;
-    font-weight: 700;
-  }
-  .tab-pill.active {
-    background: linear-gradient(135deg, #00e5a8, #3b82f6);
-    color: #061118;
-  }
-  .visual {
-    position: relative;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: linear-gradient(180deg, #ffffff, #f8fafc);
-    padding: 14px;
-    margin: 14px 0;
-    min-height: 220px;
-    overflow: hidden;
-  }
-  .mock {
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    background: #0f172a;
-    color: #e5e7eb;
-    padding: 14px;
-    box-shadow: 0 8px 24px rgba(15,23,42,.16);
-  }
-  .mock-title {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-weight: 800;
-    margin-bottom: 12px;
-  }
-  .mock-tabs {
-    display: grid;
-    gap: 8px;
-    margin-bottom: 12px;
-  }
-  .mock-tabs.six { grid-template-columns: repeat(6, 1fr); }
-  .mock-tabs.three { grid-template-columns: repeat(3, 1fr); }
-  .mock-tabs.two { grid-template-columns: repeat(2, 1fr); }
-  .mock-tab {
-    border: 1px solid rgba(255,255,255,.12);
-    background: #111827;
-    border-radius: 7px;
-    padding: 8px 6px;
-    text-align: center;
-    color: #93c5fd;
-    font-size: 11px;
-  }
-  .mock-tab.on {
-    background: rgba(0,229,168,.13);
-    border-color: #00e5a8;
-    color: #5eead4;
-  }
-  .mock-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-  }
-  .field {
-    background: #020617;
-    border: 1px solid rgba(255,255,255,.1);
-    border-radius: 7px;
-    padding: 9px;
-    min-height: 38px;
-    font-family: Consolas, "Courier New", monospace;
-    color: #f8fafc;
-    font-size: 12px;
-  }
-  .field.full { grid-column: 1 / -1; }
-  .button {
-    display: inline-block;
-    background: linear-gradient(135deg, #00e5a8, #3b82f6);
-    color: #031015;
-    font-weight: 900;
-    border-radius: 8px;
-    padding: 9px 14px;
-    margin-top: 10px;
-    font-size: 12px;
-  }
-  .callouts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-top: 12px;
-  }
-  .callout {
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    padding: 10px 12px;
-    background: white;
-  }
-  .callout b {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin-bottom: 4px;
-  }
-  .num {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    border-radius: 999px;
-    background: var(--blue);
-    color: white;
-    font-size: 12px;
-    font-weight: 900;
-    flex: none;
-  }
-  .num.green { background: var(--green); }
-  .num.amber { background: var(--amber); }
-  .num.red { background: var(--red); }
-  .num.purple { background: var(--purple); }
-  .arrow-flow {
-    display: grid;
-    grid-template-columns: 1fr 30px 1fr 30px 1fr;
-    align-items: stretch;
-    gap: 8px;
-    margin: 12px 0;
-  }
-  .flow-box {
-    border: 1px solid var(--line);
-    border-radius: 9px;
-    background: white;
-    padding: 10px;
-  }
-  .arrow {
-    align-self: center;
-    text-align: center;
-    font-size: 24px;
-    color: var(--blue);
-    font-weight: 900;
-  }
-  .example {
-    background: #0b1220;
-    color: #dbeafe;
-    border-radius: 10px;
-    padding: 13px 15px;
-    margin-top: 10px;
-    font-family: Consolas, "Courier New", monospace;
-    font-size: 12px;
-    white-space: pre-wrap;
-    border-left: 5px solid #00e5a8;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin: 10px 0 14px;
-    font-size: 12px;
-  }
-  th, td {
-    border: 1px solid var(--line);
-    padding: 8px;
-    vertical-align: top;
-    text-align: left;
-  }
-  th {
-    background: var(--dark);
-    color: white;
-  }
-  tr:nth-child(even) td { background: #f8fafc; }
-  .split {
-    display: grid;
-    grid-template-columns: 1.05fr .95fr;
-    gap: 14px;
-  }
-  .note {
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 8px;
-  }
-  .legend {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin: 8px 0 12px;
-  }
-  .legend span {
-    display: inline-block;
-    border-radius: 999px;
-    padding: 4px 9px;
-    font-size: 11px;
-    background: #eef2ff;
-    color: #3730a3;
-    font-weight: 700;
-  }
-  .footer {
-    font-size: 11px;
-    color: var(--muted);
-    border-top: 1px solid var(--line);
-    padding-top: 8px;
-    margin-top: 14px;
-  }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FD Macro Generator - Tool Guide</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071014;
+      --panel: #101827;
+      --panel-2: #0b1220;
+      --text: #f8fbff;
+      --muted: #a9b7c9;
+      --line: #24344d;
+      --accent: #00e5c4;
+      --blue: #3b82f6;
+      --gold: #f6c345;
+      --danger: #ff5d72;
+      --shadow: rgba(0, 0, 0, .32);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, rgba(0, 229, 196, .08), transparent 34rem), var(--bg);
+      color: var(--text);
+      font: 14px/1.55 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    }
+
+    main {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 42px 24px 64px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.15;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 38px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 26px;
+      margin-top: 34px;
+    }
+
+    h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    p {
+      margin: 10px 0 0;
+      color: var(--muted);
+    }
+
+    code {
+      background: rgba(255, 255, 255, .06);
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 6px;
+      padding: 1px 5px;
+      color: #d9f99d;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .92em;
+    }
+
+    .hero,
+    .section {
+      background: rgba(16, 24, 39, .92);
+      border: 1px solid rgba(148, 163, 184, .18);
+      border-radius: 10px;
+      box-shadow: 0 24px 60px var(--shadow);
+      padding: 26px;
+      margin-bottom: 26px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.25fr .75fr;
+      gap: 24px;
+      align-items: start;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(0, 229, 196, .35);
+      background: rgba(0, 229, 196, .1);
+      color: #7fffea;
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .quick-grid,
+    .legend,
+    .example-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .quick-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 14px;
+    }
+
+    .quick-card,
+    .legend-item,
+    .example {
+      background: rgba(11, 18, 32, .86);
+      border: 1px solid rgba(148, 163, 184, .14);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .quick-card strong,
+    .legend-item strong {
+      display: block;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .quick-card span,
+    .legend-item span {
+      color: var(--muted);
+      display: block;
+      font-size: 13px;
+    }
+
+    .note {
+      border-left: 3px solid var(--accent);
+      background: rgba(0, 229, 196, .08);
+      padding: 12px 14px;
+      border-radius: 8px;
+      color: #d7fffa;
+      margin-top: 14px;
+    }
+
+    .shot-wrap {
+      position: relative;
+      border: 1px solid rgba(148, 163, 184, .24);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #050b12;
+      margin: 18px 0 14px;
+    }
+
+    .shot-wrap img {
+      width: 100%;
+      display: block;
+    }
+
+    .pin {
+      position: absolute;
+      left: var(--x);
+      top: var(--y);
+      transform: translate(-50%, -50%);
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--gold);
+      color: #111827;
+      border: 2px solid #ffffff;
+      font-weight: 900;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, .42);
+      z-index: 2;
+    }
+
+    .pin::after {
+      content: "";
+      position: absolute;
+      width: 34px;
+      border-top: 2px solid var(--gold);
+      left: 24px;
+      top: 13px;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, .15);
+    }
+
+    .pin.left::after {
+      left: auto;
+      right: 24px;
+    }
+
+    .pin.blue {
+      background: #60a5fa;
+    }
+
+    .pin.green {
+      background: #34d399;
+    }
+
+    .pin.red {
+      background: #fb7185;
+    }
+
+    .legend {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-bottom: 18px;
+    }
+
+    .legend-item {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+
+    .num {
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--gold);
+      color: #111827;
+      font-weight: 900;
+      border: 2px solid #ffffff;
+    }
+
+    .flow {
+      counter-reset: step;
+      list-style: none;
+      margin: 14px 0 0;
+      padding: 0;
+      display: grid;
+      gap: 10px;
+    }
+
+    .flow li {
+      counter-increment: step;
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      align-items: start;
+      background: rgba(11, 18, 32, .86);
+      border: 1px solid rgba(148, 163, 184, .14);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .flow li::before {
+      content: counter(step);
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: var(--blue);
+      color: #ffffff;
+      font-weight: 900;
+      margin-top: 1px;
+    }
+
+    .example-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 14px;
+    }
+
+    .example pre {
+      margin: 8px 0 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #e5f7ff;
+      font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    a {
+      color: #93c5fd;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        padding: 24px 14px 40px;
+      }
+
+      .hero,
+      .quick-grid,
+      .legend,
+      .example-grid,
+      .split {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+        color: #101827;
+      }
+
+      main {
+        max-width: none;
+        padding: 0;
+      }
+
+      .hero,
+      .section,
+      .quick-card,
+      .legend-item,
+      .example {
+        background: #ffffff;
+        color: #101827;
+        box-shadow: none;
+      }
+
+      p,
+      .quick-card span,
+      .legend-item span {
+        color: #334155;
+      }
+
+      .section,
+      .hero {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
 </head>
 <body>
-
-<section class="cover">
-  <div>
-    <div class="eyebrow">FD / SL Internal Guide</div>
-    <h1>FD Macro Generator<br/>Feature Guide</h1>
-    <p class="sub">Macro Generator sekmesi hariç tüm yardımcı tab'ların ne zaman, nasıl ve hangi örnek cevapla kullanılacağını gösteren görsel rehber.</p>
-  </div>
-  <div class="meta">
-    Kapsam: Price Lookup, Funding Macro, Position History Open & Close Price Calc., Margin Restrictions<br/>
-    Format: Görsel açıklama + örnek input + örnek agent cevabı<br/>
-    Hazırlanma tarihi: 30 Nisan 2026
-  </div>
-</section>
-
-<section class="page">
-  <h2>Bu guide ne için?</h2>
-  <div class="lede">
-    Bu doküman agent'ların "hangi sekmeyi hangi müşteri sorusunda kullanmalıyım?" sorusuna hızlı cevap verir. Her bölümde sekmenin amacı, alanların anlamı, akış okları ve örnek destek cevabı bulunur.
-  </div>
-  <div class="tabs-row">
-    <span class="tab-pill">Macro Generator</span>
-    <span class="tab-pill active">Price Lookup</span>
-    <span class="tab-pill active">Funding Macro</span>
-    <span class="tab-pill active">Position History Open & Close Price Calc.</span>
-    <span class="tab-pill active">Margin Restrictions</span>
-  </div>
-  <div class="mini-grid">
-    <div class="mini-card">
-      <b>Price Lookup</b>
-      <span>Mark/Last fiyat kontrolü, hedef fiyat teması, trailing stop ve gap açıklaması.</span>
-    </div>
-    <div class="mini-card">
-      <b>Funding Macro</b>
-      <span>Funding fee açıklamasını saat, oran, mark price ve pozisyon büyüklüğü ile hazırlar.</span>
-    </div>
-    <div class="mini-card">
-      <b>Average Calculator</b>
-      <span>Pozisyon geçmişinden ortalama açılış ve kapanış fiyatlarını hesaplar.</span>
-    </div>
-    <div class="mini-card">
-      <b>Margin Restrictions</b>
-      <span>Margin buy-long risk kontrolü ve maximum collateral limit durumlarını açıklar.</span>
-    </div>
-  </div>
-
-  <h3 style="margin-top:22px">Hızlı karar ağacı</h3>
-  <div class="arrow-flow">
-    <div class="flow-box"><b>Müşteri "fiyat gördüm" diyorsa</b><br/>Price Lookup</div>
-    <div class="arrow">›</div>
-    <div class="flow-box"><b>Müşteri funding fee soruyorsa</b><br/>Funding Macro</div>
-    <div class="arrow">›</div>
-    <div class="flow-box"><b>Müşteri open/close ortalaması soruyorsa</b><br/>Average Calculator</div>
-  </div>
-  <div class="arrow-flow">
-    <div class="flow-box"><b>Müşteri long/buy veya collateral restriction görüyorsa</b><br/>Margin Restrictions</div>
-    <div class="arrow">›</div>
-    <div class="flow-box"><b>Copy reply hazırla</b><br/>Cevabı ticket'a yapıştırmadan önce tarih, sembol ve fiyatları kontrol et.</div>
-    <div class="arrow">›</div>
-    <div class="flow-box"><b>FAQ ekle</b><br/>Sadece ilgili sekmenin verdiği doğru FAQ bağlantısını kullan.</div>
-  </div>
-  <div class="footer">Not: Admin tab bu guide kapsamına alınmadı. Bu doküman agent kullanım akışlarına odaklanır.</div>
-</section>
-
-<section class="page">
-  <h2>1. Price Lookup</h2>
-  <div class="lede">
-    Kullanım amacı: Bir fiyatın gerçekten görülüp görülmediğini, hangi fiyat türünde görüldüğünü ve order trigger mantığına göre neden gerçekleşip gerçekleşmediğini açıklamak.
-  </div>
-  <div class="visual">
-    <div class="mock">
-      <div class="mock-title"><span>Price Lookup</span><span>BTCUSDT</span></div>
-      <div class="mock-tabs six">
-        <div class="mock-tab on">Trigger</div>
-        <div class="mock-tab">Range</div>
-        <div class="mock-tab">Find</div>
-        <div class="mock-tab">Trailing</div>
-        <div class="mock-tab">Last 1s</div>
-        <div class="mock-tab">Gap</div>
+  <main>
+    <section class="hero">
+      <div>
+        <div class="badge">Actual App Screenshot Guide</div>
+        <h1>FD Macro Generator Tool Guide</h1>
+        <p>This guide explains every visible button and control in the non-Macro Generator tabs. All screenshots were captured from the running application, not recreated as mockups.</p>
+        <p>The Macro Generator tab is intentionally excluded. Covered tabs: Price Lookup, Funding Macro, Position History Open & Close Price Calc., and Margin Restrictions.</p>
+        <div class="note">All time fields in these tools should be entered in UTC using <code>YYYY-MM-DD HH:MM:SS</code>.</div>
       </div>
-      <div class="mock-grid">
-        <div class="field">Market: Futures / Spot</div>
-        <div class="field">Symbol: BTCUSDT</div>
-        <div class="field full">Time or Range: YYYY-MM-DD HH:MM:SS</div>
-        <div class="field">Price Type: Last / Mark</div>
-        <div class="field">Target Price: optional by mode</div>
-      </div>
-      <span class="button">Lookup</span>
-    </div>
-  </div>
-  <div class="callouts">
-    <div class="callout"><b><span class="num">1</span> Market seçimi</b>Futures için Mark Price ve Last Price karşılaştırması yapılabilir. Spot tarafında Mark Price yoktur, Last Price kullanılır.</div>
-    <div class="callout"><b><span class="num">2</span> Mode seçimi</b>Trigger, Range, Find, Trailing, Last 1s ve Gap Explainer farklı müşteri sorularına cevap verir.</div>
-    <div class="callout"><b><span class="num green">3</span> Zaman aralığı</b>Tüm zamanlar UTC+0 formatında girilmelidir. Örnek: <code>2026-04-30 12:45:00</code>.</div>
-    <div class="callout"><b><span class="num amber">4</span> Sonuç kutusu</b>Çıktı agent'ın ticket'a uyarlayabileceği teknik özet olarak gelir.</div>
-  </div>
-
-  <h3>Mode'lar ne zaman kullanılır?</h3>
-  <table>
-    <thead><tr><th>Mode</th><th>Ne için?</th><th>Örnek müşteri sorusu</th></tr></thead>
-    <tbody>
-      <tr><td><b>Trigger</b></td><td>Belirli dakikanın 1m OHLC verisini gösterir.</td><td>"Emrim bu dakikada neden tetiklendi?"</td></tr>
-      <tr><td><b>Range</b></td><td>Bir aralıkta görülen zirve, dip ve volatiliteyi verir.</td><td>"Bu aralıkta fiyat en fazla kaçı gördü?"</td></tr>
-      <tr><td><b>Find</b></td><td>Hedef fiyatın görülüp görülmediğini arar. Görülmediyse closest miss verir.</td><td>"Grafik 95,000'e geldi ama emrim neden çalışmadı?"</td></tr>
-      <tr><td><b>Trailing</b></td><td>Activation price, peak/trough ve callback rate ile trailing stop akışını simüle eder.</td><td>"Trailing stop neden tetiklenmedi?"</td></tr>
-      <tr><td><b>Last 1s</b></td><td>Son 7 gün içinde saniyelik aggTrades datası ile Last Price detayını verir.</td><td>"O saniyede gerçekten trade var mıydı?"</td></tr>
-      <tr><td><b>Gap Explainer</b></td><td>Mark Price ve Last Price farkını karşılaştırır.</td><td>"Chart dokundu ama mark price order'ım neden tetiklenmedi?"</td></tr>
-    </tbody>
-  </table>
-
-  <h3>Örnek cevap</h3>
-  <div class="example">Symbol: BTCUSDT | Market: Futures
-Period: 2026-04-30 12:00:00 -> 2026-04-30 13:00:00 UTC+0
-
-Support summary:
-The target price was reached on Last Price, but Mark Price did not reach the same level in the selected period. If the order was configured to trigger by Mark Price, the chart's Last Price touch would not be enough to trigger it.</div>
-</section>
-
-<section class="page">
-  <h2>2. Funding Macro</h2>
-  <div class="lede">
-    Kullanım amacı: Müşterinin funding fee kesintisi veya funding payment sorusuna, Binance funding kaydı ve mark price verisiyle tutarlı açıklama hazırlamak.
-  </div>
-  <div class="split">
-    <div>
-      <div class="visual">
-        <div class="mock">
-          <div class="mock-title"><span>Funding Macro</span><span>Detailed / Summary</span></div>
-          <div class="mock-grid">
-            <div class="field">Symbol: ORCAUSDT</div>
-            <div class="field">Funding Time: 2026-04-30 08:00:00</div>
-            <div class="field">Position Size: 125</div>
-            <div class="field">Side: Long / Short</div>
-            <div class="field">Interval: 8</div>
-            <div class="field">Tone: Standard / Professional</div>
-          </div>
-          <span class="button">Generate Funding Macro</span>
+      <div class="quick-grid">
+        <div class="quick-card">
+          <strong>Price Lookup</strong>
+          <span>Checks price behavior around a timestamp, range, target price, trailing stop, one-second trades, or Mark vs Last gap.</span>
+        </div>
+        <div class="quick-card">
+          <strong>Funding Macro</strong>
+          <span>Creates a customer-ready funding fee explanation using nearest funding data, side, size, mode, and tone.</span>
+        </div>
+        <div class="quick-card">
+          <strong>Position History Calculator</strong>
+          <span>Parses Binance position history and builds average entry and close explanations.</span>
+        </div>
+        <div class="quick-card">
+          <strong>Margin Restrictions</strong>
+          <span>Checks Binance Margin restricted assets and prepares customer-ready answers with the correct FAQ links.</span>
         </div>
       </div>
-    </div>
-    <div>
-      <h3>Alanlar</h3>
-      <div class="callout"><b><span class="num">1</span> Funding Time</b>Funding kaydına yakın zaman girilir. Sistem en yakın funding record'u bulur.</div>
-      <div class="callout"><b><span class="num green">2</span> Position Size</b>Funding hesaplamasında kullanılacak pozisyon büyüklüğüdür.</div>
-      <div class="callout"><b><span class="num amber">3</span> Apply Binance Precision</b>Sonradan exchangeInfo fiyat hassasiyetine göre mark price truncate eder. Yuvarlama değil, Binance tarzı kesme uygulanır.</div>
-    </div>
-  </div>
+    </section>
 
-  <h3>Akış</h3>
-  <div class="arrow-flow">
-    <div class="flow-box"><b>1. Funding kaydı bulunur</b><br/>`fundingRate` endpoint'e yakın kayıt aranır.</div>
-    <div class="arrow">›</div>
-    <div class="flow-box"><b>2. Mark price tamamlanır</b><br/>Funding kaydında yoksa 1m mark close fallback alınır.</div>
-    <div class="arrow">›</div>
-    <div class="flow-box"><b>3. Macro üretilir</b><br/>Detailed veya Summary moduna göre cevap hazırlanır.</div>
-  </div>
-
-  <h3>Örnek cevap</h3>
-  <div class="example">Funding Time: 2026-04-30 08:00:00 UTC+0
-Symbol: ORCAUSDT
-Funding Rate: 0.0100%
-Position Side: Long
-
-The funding fee was calculated based on your position size and the funding rate recorded at the funding time. Since the position was Long, a positive funding rate means the long side pays funding to the short side.</div>
-</section>
-
-<section class="page">
-  <h2>3. Position History Open & Close Price Calc.</h2>
-  <div class="lede">
-    Kullanım amacı: Binance position/order history paste datasından ortalama açılış fiyatı, ortalama kapanış fiyatı, partial close, full close ve flip durumlarını hızlı hesaplamak.
-  </div>
-  <div class="visual">
-    <div class="mock">
-      <div class="mock-title"><span>Position History Open & Close Price Calc.</span><span>LONG / SHORT</span></div>
-      <div class="mock-tabs two">
-        <div class="mock-tab on">LONG</div>
-        <div class="mock-tab">SHORT</div>
+    <section class="section">
+      <h2>Shared Header</h2>
+      <p>These controls appear above every tab. The screenshot below uses the Price Lookup tab as the example.</p>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/price-lookup-trigger.png" alt="Shared header screenshot">
+        <span class="pin green" style="--x:36%;--y:4.4%">1</span>
+        <span class="pin blue" style="--x:86.5%;--y:4.4%">2</span>
+        <span class="pin" style="--x:42%;--y:8.9%">3</span>
       </div>
-      <div class="mock-grid">
-        <div class="field full" style="min-height:88px">Paste position history here...
-2026-04-30 10:00:00 BTCUSDT BUY 0.1000 64000
-2026-04-30 10:30:00 BTCUSDT SELL 0.0500 64500</div>
-        <div class="field">Status: parsed trades</div>
-        <div class="field">Grouped result: BTCUSDT</div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>Live ticker</strong><span>Shows the active symbol and recent 1 minute Binance OHLC status. It is informational and helps agents keep the current symbol in view.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>EN / TR</strong><span>Switches the application language. This guide uses English UI labels.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>Tool tabs</strong><span>Switches between Macro Generator, Price Lookup, Funding Macro, Position History Open & Close Price Calc., and Margin Restrictions.</span></div></div>
       </div>
-      <span class="button">Copy Complete Answer</span>
-    </div>
-  </div>
-  <div class="callouts">
-    <div class="callout"><b><span class="num">1</span> LONG / SHORT seçimi</b>One-way pozisyon geçmişinde seçilen yön hesap mantığını belirler. Hedge mode varsa paste içindeki LONG/SHORT/BOTH bilgisi de dikkate alınır.</div>
-    <div class="callout"><b><span class="num green">2</span> Paste alanı</b>Binance history satırları yapıştırılır. Sistem tarih, side, fiyat, quantity ve order id adaylarını ayrıştırır.</div>
-    <div class="callout"><b><span class="num amber">3</span> Merged fills</b>Aynı order id veya aynı tarih/side ile gelen fill'ler tek işlem gibi konsolide edilir.</div>
-    <div class="callout"><b><span class="num red">4</span> Flip detection</b>Bir emir eski pozisyonu kapatıp kalan miktarla ters pozisyon açarsa guide bunu ayrıca vurgular.</div>
-  </div>
+    </section>
 
-  <h3>Ne zaman kullanılır?</h3>
-  <table>
-    <thead><tr><th>Durum</th><th>Bu tab'ın cevabı</th></tr></thead>
-    <tbody>
-      <tr><td>Müşteri "ortalama açılış fiyatım ne?" diyor.</td><td>Entry fills üzerinden weighted average entry hesaplar.</td></tr>
-      <tr><td>Müşteri "kapatma ortalamam ne?" diyor.</td><td>Close fills üzerinden weighted average close hesaplar.</td></tr>
-      <tr><td>Pozisyon parça parça kapanmış.</td><td>Reduced / Closed ayrımı ile her adımı açıklar.</td></tr>
-      <tr><td>Position flip olmuş.</td><td>Eski pozisyonun kapanan miktarını ve yeni açılan miktarı ayrı gösterir.</td></tr>
-    </tbody>
-  </table>
+    <section class="section">
+      <h2>Price Lookup - What It Does</h2>
+      <p>Price Lookup is the investigation tab. It pulls public Binance market data and turns it into support-friendly evidence. Use it when a customer asks whether a trigger was reached, why a trailing stop did or did not trigger, or why Mark Price and Last Price behaved differently.</p>
+      <ol class="flow">
+        <li><div><strong>Select market.</strong> Use Futures when the order belongs to Futures. Use Spot only for spot-market checks. Futures can compare both Mark Price and Last Price.</div></li>
+        <li><div><strong>Select a mode.</strong> Trigger, Range, Find, Trailing, Last 1s, and Gap each answer a different investigation question.</div></li>
+        <li><div><strong>Enter symbol and UTC time fields.</strong> The symbol is shared with the live ticker, and all timestamps must be UTC.</div></li>
+        <li><div><strong>Pick mode-specific options.</strong> Examples: Target Price, Last/Mark radio buttons, Long/Short direction, Activation Price, Callback Rate, or trigger type.</div></li>
+        <li><div><strong>Click Lookup.</strong> The result appears in a textarea that can be copied into the agent workflow.</div></li>
+      </ol>
 
-  <h3>Örnek cevap</h3>
-  <div class="example">[LONG Position Expanded] Order ID: 123456789 - 0.0500 amount of BTCUSDT was bought to expand the position at 64000.
-New average entry price: 64125.00000000
-
-[LONG Position Reduced] Order ID: 123456790 - 0.0300 amount of BTCUSDT was sold to reduce the position at 64500.
-New average close price: 64500.00000000</div>
-</section>
-
-<section class="page">
-  <h2>4. Margin Restrictions</h2>
-  <div class="lede">
-    Kullanım amacı: Binance Margin tarafında buy-long risk control ve maximum collateral limit kaynaklı kısıtları agent'ın doğru FAQ ve doğru açıklama ile cevaplamasını sağlamak.
-  </div>
-  <div class="visual">
-    <div class="mock">
-      <div class="mock-title"><span>Margin Restrictions</span><span>Server-side API key active</span></div>
-      <div class="mock-tabs three">
-        <div class="mock-tab on">Restriction Check</div>
-        <div class="mock-tab">Full List</div>
-        <div class="mock-tab">Changes</div>
+      <h3>Trigger Mode</h3>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/price-lookup-trigger.png" alt="Price Lookup Trigger mode screenshot">
+        <span class="pin green" style="--x:31%;--y:22%">1</span>
+        <span class="pin" style="--x:17%;--y:30%">2</span>
+        <span class="pin" style="--x:31%;--y:30%">3</span>
+        <span class="pin" style="--x:43%;--y:30%">4</span>
+        <span class="pin" style="--x:56%;--y:30%">5</span>
+        <span class="pin" style="--x:69%;--y:30%">6</span>
+        <span class="pin" style="--x:83%;--y:30%">7</span>
+        <span class="pin blue" style="--x:50%;--y:38.5%">8</span>
+        <span class="pin blue" style="--x:50%;--y:47%">9</span>
+        <span class="pin red" style="--x:50%;--y:51.5%">10</span>
       </div>
-      <div class="mock-grid">
-        <div class="field full">Asset: YFI</div>
-        <div class="field">Buy Long restricted: 0</div>
-        <div class="field">Max collateral exceeded: 161</div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>Futures / Spot</strong><span>Choose the market source. Futures returns Mark Price and Last Price data; Spot returns Last Price data.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>Trigger</strong><span>Checks the 1 minute OHLC candle at the exact trigger timestamp.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>Range</strong><span>Finds highest, lowest, timestamp of each, and volatility across a time window.</span></div></div>
+        <div class="legend-item"><span class="num">4</span><div><strong>Find</strong><span>Searches whether a target price was touched in the selected period. If not reached, it reports the closest miss.</span></div></div>
+        <div class="legend-item"><span class="num">5</span><div><strong>Trailing</strong><span>Replays a trailing stop using direction, activation price, and callback rate.</span></div></div>
+        <div class="legend-item"><span class="num">6</span><div><strong>Last 1s</strong><span>Builds one-second OHLC from recent individual trades. Binance trade data is limited to the recent window.</span></div></div>
+        <div class="legend-item"><span class="num">7</span><div><strong>Gap</strong><span>Compares Mark Price and Last Price over the same period to explain trigger disputes.</span></div></div>
+        <div class="legend-item"><span class="num">8</span><div><strong>Symbol</strong><span>Trading pair to investigate, for example <code>BTCUSDT</code>.</span></div></div>
+        <div class="legend-item"><span class="num">9</span><div><strong>At (UTC)</strong><span>The timestamp to inspect in Trigger or Last 1s mode.</span></div></div>
+        <div class="legend-item"><span class="num">10</span><div><strong>Lookup</strong><span>Runs the selected investigation and writes the evidence into the result box.</span></div></div>
       </div>
-      <span class="button">Refresh</span>
-    </div>
-  </div>
-  <div class="callouts">
-    <div class="callout"><b><span class="num">1</span> Restriction Check</b>Tek coin kontrolü yapar ve copy-paste customer reply üretir.</div>
-    <div class="callout"><b><span class="num red">2</span> Buy Long restricted</b>Open/increase long kısıtlıdır. Reduce-only ve close position akışı halen mümkündür.</div>
-    <div class="callout"><b><span class="num amber">3</span> Max collateral exceeded</b>Varlık platform maximum collateral limitine takılmıştır. Yeni collateral transferi kısıtlanabilir.</div>
-    <div class="callout"><b><span class="num purple">4</span> FAQ butonları</b>Risk control ve max collateral için ayrı doğru FAQ bağlantısı gösterilir.</div>
-  </div>
 
-  <h3>İki farklı kısıt türü</h3>
-  <table>
-    <thead><tr><th>Kısıt</th><th>Anlamı</th><th>Doğru FAQ</th></tr></thead>
-    <tbody>
-      <tr><td><b>Margin Buy (Long) Restricted</b></td><td>Yeni long açma veya long artırma kısıtlı olabilir. Buy market reduce-only olarak net liabilities tutarıyla sınırlanır.</td><td>Binance Cross Margin Trading Risk Control</td></tr>
-      <tr><td><b>Max Collateral Exceeded</b></td><td>Asset platform-wide maximum collateral threshold'a ulaşmıştır. Ek collateral transferi kısıtlanabilir.</td><td>Maximum Collateral Limit for Margin Assets</td></tr>
-      <tr><td><b>Both</b></td><td>İki durum da aktifse agent iki FAQ'yu da paylaşmalıdır.</td><td>Risk Control + Maximum Collateral</td></tr>
-    </tbody>
-  </table>
+      <h3>Range Mode</h3>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/price-lookup-range.png" alt="Price Lookup Range mode screenshot">
+        <span class="pin" style="--x:31%;--y:30%">1</span>
+        <span class="pin blue" style="--x:25%;--y:46%">2</span>
+        <span class="pin blue" style="--x:63%;--y:46%">3</span>
+        <span class="pin green left" style="--x:86%;--y:42.7%">4</span>
+        <span class="pin red" style="--x:50%;--y:55%">5</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>Range</strong><span>Use when the customer asks about the highest/lowest price during a period.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>From (UTC)</strong><span>Start of the investigation window.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>To (UTC)</strong><span>End of the investigation window.</span></div></div>
+        <div class="legend-item"><span class="num">4</span><div><strong>Present Time</strong><span>Sets the To field to about one minute ago in UTC. Use it for live or still-open cases.</span></div></div>
+        <div class="legend-item"><span class="num">5</span><div><strong>Lookup</strong><span>Returns period high, low, time of high/low, and volatility.</span></div></div>
+      </div>
 
-  <h3>Örnek cevap</h3>
-  <div class="example">YFI has reached Binance's platform-wide maximum collateral threshold. No additional YFI can be transferred into the cross-margin account as collateral until the cap frees up.
+      <h3>Find Mode</h3>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/price-lookup-find.png" alt="Price Lookup Find mode screenshot">
+        <span class="pin" style="--x:43%;--y:30%">1</span>
+        <span class="pin blue" style="--x:50%;--y:55%">2</span>
+        <span class="pin green" style="--x:18%;--y:59.8%">3</span>
+        <span class="pin red" style="--x:50%;--y:64%">4</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>Find</strong><span>Use to prove whether a target price was reached and identify the first contact time.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>Target Price</strong><span>The price level the customer claims was touched or not touched.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>Last Price / Mark Price</strong><span>For Futures, choose the trigger source used by the order. Spot uses Last Price only.</span></div></div>
+        <div class="legend-item"><span class="num">4</span><div><strong>Lookup</strong><span>If reached, returns first contact time. If not reached, returns closest observed price and miss distance.</span></div></div>
+      </div>
 
-Your existing YFI balance in margin still functions normally: trading, borrowing, and closing positions are unaffected.
+      <h3>Trailing Mode</h3>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/price-lookup-trailing.png" alt="Price Lookup Trailing mode screenshot">
+        <span class="pin" style="--x:56%;--y:30%">1</span>
+        <span class="pin blue" style="--x:30%;--y:55%">2</span>
+        <span class="pin red" style="--x:70%;--y:55%">3</span>
+        <span class="pin green" style="--x:27%;--y:68%">4</span>
+        <span class="pin green" style="--x:64%;--y:68%">5</span>
+        <span class="pin blue" style="--x:27%;--y:73.5%">6</span>
+        <span class="pin red" style="--x:50%;--y:78%">7</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>Trailing</strong><span>Use for trailing-stop complaints. The tool checks activation, reference peak/trough, callback movement, and trigger state.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>Long (Buy Trigger)</strong><span>Use when a trailing buy should trigger after price rebounds from the trough.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>Short (Sell Trigger)</strong><span>Use when a trailing sell should trigger after price pulls back from the peak.</span></div></div>
+        <div class="legend-item"><span class="num">4</span><div><strong>Activation Price</strong><span>The order first becomes active only after this price condition is met.</span></div></div>
+        <div class="legend-item"><span class="num">5</span><div><strong>Callback Rate (%)</strong><span>The required percentage pullback or rebound after activation.</span></div></div>
+        <div class="legend-item"><span class="num">6</span><div><strong>Price source</strong><span>Choose Last Price for exact trade evidence or Mark Price for mark-triggered Futures orders.</span></div></div>
+        <div class="legend-item"><span class="num">7</span><div><strong>Lookup</strong><span>Produces an agent summary explaining activation, reference point, next trigger level, or trigger time.</span></div></div>
+      </div>
 
-More info:
-Maximum Collateral Limit for Margin Assets
-https://www.binance.com/en/support/faq/detail/dca77ef963294b368b5ebad0affeda09</div>
-</section>
+      <h3>Last 1s and Gap Modes</h3>
+      <div class="split">
+        <div>
+          <div class="shot-wrap">
+            <img src="feature-guide-assets/price-lookup-last1s.png" alt="Price Lookup Last 1s mode screenshot">
+            <span class="pin" style="--x:69%;--y:30%">1</span>
+            <span class="pin blue" style="--x:50%;--y:47%">2</span>
+            <span class="pin red" style="--x:50%;--y:52%">3</span>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="num">1</span><div><strong>Last 1s</strong><span>Checks exact trade activity inside one second.</span></div></div>
+            <div class="legend-item"><span class="num">2</span><div><strong>DateTime (UTC)</strong><span>The second to inspect.</span></div></div>
+            <div class="legend-item"><span class="num">3</span><div><strong>Lookup</strong><span>Returns one-second open, high, low, close, and trade count.</span></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="shot-wrap">
+            <img src="feature-guide-assets/price-lookup-gap.png" alt="Price Lookup Gap Explainer mode screenshot">
+            <span class="pin" style="--x:83%;--y:30%">1</span>
+            <span class="pin blue" style="--x:28%;--y:60%">2</span>
+            <span class="pin green" style="--x:70%;--y:59.5%">3</span>
+            <span class="pin red" style="--x:50%;--y:65%">4</span>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="num">1</span><div><strong>Gap</strong><span>Use when the chart touched a level but the order did not trigger.</span></div></div>
+            <div class="legend-item"><span class="num">2</span><div><strong>Target Price</strong><span>Optional. Add it when the customer mentions a specific level.</span></div></div>
+            <div class="legend-item"><span class="num">3</span><div><strong>Trigger Type</strong><span>Choose Not specified, MARK, or LAST to match the customer order settings.</span></div></div>
+            <div class="legend-item"><span class="num">4</span><div><strong>Lookup</strong><span>Compares Mark Price vs Last Price and writes a support explanation.</span></div></div>
+          </div>
+        </div>
+      </div>
 
-<section class="page">
-  <h2>Agent için hızlı kullanım özeti</h2>
-  <table>
-    <thead><tr><th>Müşteri sorusu</th><th>Kullanılacak tab</th><th>Kontrol edilecek alan</th><th>Cevap tipi</th></tr></thead>
-    <tbody>
-      <tr><td>"Fiyat bu seviyeye geldi mi?"</td><td>Price Lookup</td><td>Find + Last/Mark seçimi</td><td>Reached / closest miss</td></tr>
-      <tr><td>"Grafikte dokundu ama order çalışmadı."</td><td>Price Lookup</td><td>Gap Explainer</td><td>Mark vs Last farkı</td></tr>
-      <tr><td>"Trailing stop neden tetiklenmedi?"</td><td>Price Lookup</td><td>Trailing</td><td>Activation, peak/trough, callback</td></tr>
-      <tr><td>"Funding fee neden böyle?"</td><td>Funding Macro</td><td>Funding time, side, size</td><td>Funding explanation macro</td></tr>
-      <tr><td>"Open/close average price ne?"</td><td>Average Calculator</td><td>Paste history + LONG/SHORT</td><td>Weighted average answer</td></tr>
-      <tr><td>"Bu coin margin'de neden kısıtlı?"</td><td>Margin Restrictions</td><td>Restriction Check</td><td>Risk control veya collateral FAQ</td></tr>
-    </tbody>
-  </table>
-  <div class="footer">
-    Bu guide canlı uygulamadaki mevcut tab yapısına göre hazırlandı. Macro Generator tab'ı özellikle kapsam dışı bırakıldı.
-  </div>
-</section>
+      <div class="example-grid">
+        <div class="example">
+          <strong>Example Price Lookup answer</strong>
+          <pre>The target price was not reached by Mark Price during the selected period. The closest observed Mark Price was 94,980 at 2026-04-30 11:24:00 UTC, which remained 20 USDT away from the target.</pre>
+        </div>
+        <div class="example">
+          <strong>Example trailing answer</strong>
+          <pre>The order activated at 10:18:00 UTC. After activation, the highest Last Price was 95,200. With a 1.5% callback, price needed to pull back to 93,772. It only pulled back 0.8%, so the trailing stop did not trigger.</pre>
+        </div>
+      </div>
+    </section>
 
+    <section class="section">
+      <h2>Funding Macro</h2>
+      <p>Funding Macro builds a customer-ready explanation from funding time, position size, side, interval, output mode, and tone.</p>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/funding-macro.png" alt="Funding Macro screenshot">
+        <span class="pin blue" style="--x:31%;--y:24%">1</span>
+        <span class="pin blue" style="--x:70%;--y:24%">2</span>
+        <span class="pin blue" style="--x:31%;--y:31%">3</span>
+        <span class="pin blue" style="--x:70%;--y:31%">4</span>
+        <span class="pin blue" style="--x:31%;--y:38%">5</span>
+        <span class="pin green" style="--x:31%;--y:45%">6</span>
+        <span class="pin green" style="--x:70%;--y:45%">7</span>
+        <span class="pin red" style="--x:50%;--y:52%">8</span>
+        <span class="pin" style="--x:31%;--y:57%">9</span>
+        <span class="pin" style="--x:70%;--y:57%">10</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>Symbol</strong><span>Futures symbol, for example <code>BTCUSDT</code>.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>Funding Time (UTC)</strong><span>The funding timestamp to investigate. The tool finds the nearest funding record.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>Position Size</strong><span>The customer's position size used in the funding fee calculation.</span></div></div>
+        <div class="legend-item"><span class="num">4</span><div><strong>Position Side</strong><span>Long or Short. This affects whether the customer paid or received funding.</span></div></div>
+        <div class="legend-item"><span class="num">5</span><div><strong>Funding Interval</strong><span>Funding cycle in hours, commonly 8, but some symbols can use other intervals.</span></div></div>
+        <div class="legend-item"><span class="num">6</span><div><strong>Output Mode</strong><span>Detailed / Professional gives full evidence; Summary is shorter.</span></div></div>
+        <div class="legend-item"><span class="num">7</span><div><strong>Tone</strong><span>Controls the wording style: Standard, Professional, Empathetic, or Direct.</span></div></div>
+        <div class="legend-item"><span class="num">8</span><div><strong>Generate Funding Macro</strong><span>Fetches funding data and writes the answer into the result box.</span></div></div>
+        <div class="legend-item"><span class="num">9</span><div><strong>Copy</strong><span>Copies the generated macro. It stays disabled until a result exists.</span></div></div>
+        <div class="legend-item"><span class="num">10</span><div><strong>Apply Precision</strong><span>After generation, truncates mark price using Binance exchange precision and regenerates the answer.</span></div></div>
+      </div>
+      <div class="example">
+        <strong>Example Funding Macro answer</strong>
+        <pre>At the selected funding time, the funding rate was applied to the notional value of the position. Based on the customer's Long side and position size, this explains why the funding fee was charged or credited.</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Position History Open & Close Price Calc.</h2>
+      <p>This tab parses Binance order history rows and generates average entry and close explanations for support replies.</p>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/average-calculator.png" alt="Position History calculator screenshot">
+        <span class="pin green" style="--x:19%;--y:26%">1</span>
+        <span class="pin" style="--x:30%;--y:26%">2</span>
+        <span class="pin red" style="--x:24%;--y:31%">3</span>
+        <span class="pin blue" style="--x:24%;--y:50%">4</span>
+        <span class="pin green" style="--x:17%;--y:22%">5</span>
+        <span class="pin" style="--x:65%;--y:30%">6</span>
+        <span class="pin red left" style="--x:84%;--y:24%">7</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>LONG</strong><span>Interprets one-way BUY activity as opening or expanding a long unless hedge side data says otherwise.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>SHORT</strong><span>Interprets one-way SELL activity as opening or expanding a short unless hedge side data says otherwise.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>Clear Data</strong><span>Resets pasted input, parsed trades, calculated results, and status.</span></div></div>
+        <div class="legend-item"><span class="num">4</span><div><strong>Paste area</strong><span>Paste Binance order history rows here. Parsing runs automatically; there is no Generate button.</span></div></div>
+        <div class="legend-item"><span class="num">5</span><div><strong>Status line</strong><span>Shows whether parsing is ready and how many trades were extracted.</span></div></div>
+        <div class="legend-item"><span class="num">6</span><div><strong>Copy Full Explanation</strong><span>Copies the complete customer-ready explanation, including formulas and phase summaries.</span></div></div>
+        <div class="legend-item"><span class="num">7</span><div><strong>Average summary</strong><span>Shows calculated average entry and average close values for the parsed symbol.</span></div></div>
+      </div>
+      <div class="example">
+        <strong>Example average calculator answer</strong>
+        <pre>The LONG position started with order 123456789 and was expanded by order 123456790. The average entry was calculated as ((0.1500 x 64166.6667) + (0.0200 x 64200.0000)) / 0.1700 = 64170.58823529.</pre>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Margin Restrictions</h2>
+      <p>This tab checks Binance Margin restriction data from <code>GET /sapi/v1/margin/restricted-asset</code>. It is designed so agents do not need to provide an API key manually. The app uses the configured shared/default key path, and agents should simply refresh or search the asset.</p>
+      <div class="note">Restriction meaning: <code>openLongRestrictedAsset</code> means Binance Margin Buy (Long) Risk Control is active. Users may be blocked from opening or increasing long positions, while close position and repay flows remain allowed. <code>maxCollateralExceededAsset</code> means the platform-wide collateral cap is reached, so additional transfers into cross margin as collateral can be blocked.</div>
+
+      <h3>Restriction Check</h3>
+      <div class="shot-wrap">
+        <img src="feature-guide-assets/margin-check.png" alt="Margin Restrictions check screenshot">
+        <span class="pin green" style="--x:20%;--y:21%">1</span>
+        <span class="pin" style="--x:86%;--y:21%">2</span>
+        <span class="pin blue" style="--x:50%;--y:25%">3</span>
+        <span class="pin" style="--x:24%;--y:33%">4</span>
+        <span class="pin" style="--x:50%;--y:33%">5</span>
+        <span class="pin" style="--x:80%;--y:33%">6</span>
+        <span class="pin blue" style="--x:50%;--y:42%">7</span>
+        <span class="pin green" style="--x:50%;--y:56%">8</span>
+        <span class="pin red" style="--x:17%;--y:79.5%">9</span>
+        <span class="pin red" style="--x:29%;--y:79.5%">10</span>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><span class="num">1</span><div><strong>Shared/default API key status</strong><span>Confirms the app can fetch restriction data without asking every agent for an API key.</span></div></div>
+        <div class="legend-item"><span class="num">2</span><div><strong>Override Key</strong><span>Optional browser-local override. Do not use it in normal agent workflow unless instructed.</span></div></div>
+        <div class="legend-item"><span class="num">3</span><div><strong>Data as of / Refresh</strong><span>Shows fetch time and counts. Refresh requests the latest Binance restriction list.</span></div></div>
+        <div class="legend-item"><span class="num">4</span><div><strong>Restriction Check</strong><span>Checks one asset and prepares a diagnosis plus customer reply.</span></div></div>
+        <div class="legend-item"><span class="num">5</span><div><strong>Full List</strong><span>Shows all restricted assets in both categories.</span></div></div>
+        <div class="legend-item"><span class="num">6</span><div><strong>Changes</strong><span>Shows added or removed restrictions after refresh comparisons.</span></div></div>
+        <div class="legend-item"><span class="num">7</span><div><strong>Asset input</strong><span>Enter a token symbol such as <code>YFI</code>, <code>CHZ</code>, or <code>ADA</code>.</span></div></div>
+        <div class="legend-item"><span class="num">8</span><div><strong>Diagnosis and customer reply</strong><span>Explains whether the asset is unrestricted, Buy Long restricted, max collateral exceeded, or both.</span></div></div>
+        <div class="legend-item"><span class="num">9</span><div><strong>Copy Reply</strong><span>Copies the prepared customer response.</span></div></div>
+        <div class="legend-item"><span class="num">10</span><div><strong>FAQ button</strong><span>Opens the relevant Binance FAQ, such as Maximum Collateral Limit or Cross Margin Trading Risk Control.</span></div></div>
+      </div>
+
+      <h3>Full List and Changes</h3>
+      <div class="split">
+        <div>
+          <div class="shot-wrap">
+            <img src="feature-guide-assets/margin-full-list.png" alt="Margin Restrictions full list screenshot">
+            <span class="pin blue" style="--x:50%;--y:41%">1</span>
+            <span class="pin red" style="--x:28%;--y:49%">2</span>
+            <span class="pin" style="--x:70%;--y:49%">3</span>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="num">1</span><div><strong>Filter</strong><span>Filters both lists by token symbol.</span></div></div>
+            <div class="legend-item"><span class="num">2</span><div><strong>Margin Buy (Long) Restricted</strong><span>Assets currently blocked from opening or increasing long positions.</span></div></div>
+            <div class="legend-item"><span class="num">3</span><div><strong>Max collateral exceeded</strong><span>Assets at Binance's platform-wide collateral cap.</span></div></div>
+          </div>
+        </div>
+        <div>
+          <div class="shot-wrap">
+            <img src="feature-guide-assets/margin-changes.png" alt="Margin Restrictions changes screenshot">
+            <span class="pin blue" style="--x:80%;--y:33%">1</span>
+            <span class="pin green" style="--x:42%;--y:41%">2</span>
+          </div>
+          <div class="legend">
+            <div class="legend-item"><span class="num">1</span><div><strong>Changes</strong><span>Shows historical differences when a refresh adds or removes assets.</span></div></div>
+            <div class="legend-item"><span class="num">2</span><div><strong>Empty history message</strong><span>If no changes have been detected yet, the tab explains that entries are logged after refresh comparisons.</span></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="example-grid">
+        <div class="example">
+          <strong>Example max collateral reply</strong>
+          <pre>YFI has reached Binance's platform-wide maximum collateral threshold. No additional YFI can be transferred into cross margin as collateral until the cap frees up. Existing YFI balance, trading, and borrowing are unaffected.</pre>
+        </div>
+        <div class="example">
+          <strong>Correct FAQ links</strong>
+          <pre>Maximum Collateral Limit for Margin Assets:
+https://www.binance.com/en/support/faq/detail/dca77ef963294b368b5ebad0affeda09
+
+Binance Cross Margin Trading Risk Control:
+https://www.binance.com/en/support/faq/detail/b83f0a71a1b448aaaad5e970a9936472</pre>
+        </div>
+      </div>
+    </section>
+  </main>
 </body>
 </html>
