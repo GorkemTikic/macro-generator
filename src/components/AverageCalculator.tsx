@@ -12,6 +12,11 @@ export default function AverageCalculator({ lang, uiStrings }) {
 
   const t = uiStrings; 
 
+  const normalizeSymbol = (value) => {
+    const cleaned = String(value || "").toUpperCase().replace(/[^A-Z0-9_/-]/g, "");
+    return cleaned || "UNKNOWN";
+  };
+
   const handleClear = () => {
     setRawInput("");
     setParsedTrades([]);
@@ -29,7 +34,7 @@ export default function AverageCalculator({ lang, uiStrings }) {
       return;
     }
     parseData(rawInput);
-  }, [rawInput, positionType]);
+  }, [rawInput, positionType, lang]);
 
   const parseData = (inputVal) => {
     const rawTokens = inputVal.trim().split(/\s+/);
@@ -44,7 +49,7 @@ export default function AverageCalculator({ lang, uiStrings }) {
             let symbol = "UNKNOWN";
 
             if (i + 2 < rawTokens.length) {
-                symbol = rawTokens[i + 2].toUpperCase();
+                symbol = normalizeSymbol(rawTokens[i + 2]);
             }
 
             let positionSide = "BOTH";

@@ -308,7 +308,7 @@ export default function PriceLookup({ lang, uiStrings }) {
         const data = await checkTrailingStop(sTrim, fTrim, tTrim, actPrice, cbRate, direction, market, finalType);
 
         if (data.status === "not_found") {
-          return setResult(`${t.lookupNotFound}\n\nDEBUG: Symbol: ${sTrim}, From: ${fTrim}, To: ${tTrim}, Market: ${market}`);
+          return setResult(t.lookupNotFound);
         }
 
         let msg = `## ${data.status === 'triggered' ? t.trailingTriggeredTitle : t.trailingNotTriggeredTitle}\n\n`;

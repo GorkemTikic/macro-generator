@@ -63,8 +63,6 @@ export default function FundingMacro({ lang, uiStrings }) {
         fundingTimeStr = closeData.close_time;
       }
 
-      console.log("[Generate] rawMarkPrice:", markPrice);
-
       const inputs = {
         symbol: symbol.toUpperCase(),
         funding_time: fundingTimeStr,
@@ -107,8 +105,6 @@ export default function FundingMacro({ lang, uiStrings }) {
       }
       const allPrecisions = await getAllSymbolPrecisions();
       const pricePrecision = allPrecisions[lastInputs.symbol] || 2;
-
-      console.log("[ApplyPrecision]", lastInputs.symbol, "raw:", rawMarkPrice, "pricePrecision:", pricePrecision);
 
       const truncated = fmtNum(rawMarkPrice, pricePrecision);
 

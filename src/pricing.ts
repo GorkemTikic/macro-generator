@@ -390,7 +390,6 @@ export async function getAllSymbolPrecisions() {
   for (const s of data.symbols) {
     map[s.symbol] = s.pricePrecision;
   }
-  console.log("[getAllSymbolPrecisions] loaded", Object.keys(map).length, "symbols");
   symbolPrecisionCache = map;
   return map;
 }
@@ -868,4 +867,3 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
     period: `${fromStr} -> ${toStr}`
   };
 }
-
