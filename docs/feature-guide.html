@@ -168,28 +168,30 @@
       position: absolute;
       left: var(--x);
       top: var(--y);
-      transform: translate(-50%, -50%);
-      width: 28px;
-      height: 28px;
+      transform: translate(-50%, -140%);
+      width: 17px;
+      height: 17px;
       border-radius: 999px;
       display: grid;
       place-items: center;
-      background: var(--gold);
-      color: #111827;
-      border: 2px solid #ffffff;
+      background: rgba(15, 23, 42, .96);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, .82);
       font-weight: 900;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, .42);
+      font-size: 9px;
+      line-height: 1;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, .42);
       z-index: 2;
     }
 
     .pin::after {
       content: "";
       position: absolute;
-      width: 34px;
-      border-top: 2px solid var(--gold);
-      left: 24px;
-      top: 13px;
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, .15);
+      width: 18px;
+      border-top: 1px solid rgba(246, 195, 69, .82);
+      left: 15px;
+      top: 8px;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, .12);
     }
 
     .pin.left::after {
@@ -198,15 +200,15 @@
     }
 
     .pin.blue {
-      background: #60a5fa;
+      background: rgba(37, 99, 235, .96);
     }
 
     .pin.green {
-      background: #34d399;
+      background: rgba(5, 150, 105, .96);
     }
 
     .pin.red {
-      background: #fb7185;
+      background: rgba(220, 38, 38, .96);
     }
 
     .legend {
@@ -216,21 +218,60 @@
 
     .legend-item {
       display: grid;
-      grid-template-columns: 34px 1fr;
-      gap: 10px;
+      grid-template-columns: 26px 1fr;
+      gap: 9px;
       align-items: start;
+      min-height: 82px;
     }
 
     .num {
-      width: 26px;
-      height: 26px;
+      width: 20px;
+      height: 20px;
       border-radius: 999px;
       display: grid;
       place-items: center;
-      background: var(--gold);
-      color: #111827;
+      background: rgba(15, 23, 42, .96);
+      color: #ffffff;
       font-weight: 900;
-      border: 2px solid #ffffff;
+      font-size: 11px;
+      border: 1px solid rgba(255, 255, 255, .7);
+      margin-top: 2px;
+    }
+
+    .agent-panel {
+      background: linear-gradient(135deg, rgba(0, 229, 196, .1), rgba(59, 130, 246, .08));
+      border: 1px solid rgba(0, 229, 196, .24);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin-top: 14px;
+    }
+
+    .agent-panel strong {
+      color: #ffffff;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .agent-panel ul {
+      margin: 0;
+      padding-left: 18px;
+      color: #d7e8f7;
+    }
+
+    .agent-panel li {
+      margin: 5px 0;
+    }
+
+    .mode-card {
+      border: 1px solid rgba(148, 163, 184, .16);
+      background: rgba(11, 18, 32, .78);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin: 12px 0 16px;
+    }
+
+    .mode-card b {
+      color: #ffffff;
     }
 
     .flow {
@@ -345,7 +386,7 @@
       <div>
         <div class="badge">Actual App Screenshot Guide</div>
         <h1>FD Macro Generator Tool Guide</h1>
-        <p>This guide explains every visible button and control in the non-Macro Generator tabs. All screenshots were captured from the running application, not recreated as mockups.</p>
+        <p>This guide is built for support agents: each screenshot is a control map, and each note explains when to use the control, what data to enter, and what output the agent should copy or verify.</p>
         <p>The Macro Generator tab is intentionally excluded. Covered tabs: Price Lookup, Funding Macro, Position History Open & Close Price Calc., and Margin Restrictions.</p>
         <div class="note">All time fields in these tools should be entered in UTC using <code>YYYY-MM-DD HH:MM:SS</code>.</div>
       </div>
@@ -388,6 +429,15 @@
     <section class="section">
       <h2>Price Lookup - What It Does</h2>
       <p>Price Lookup is the investigation tab. It pulls public Binance market data and turns it into support-friendly evidence. Use it when a customer asks whether a trigger was reached, why a trailing stop did or did not trigger, or why Mark Price and Last Price behaved differently.</p>
+      <div class="agent-panel">
+        <strong>Agent workflow for Price Lookup</strong>
+        <ul>
+          <li>Match the customer's order market first. Futures cases usually need Futures, not Spot.</li>
+          <li>Match the order's trigger source. If the order used Mark Price, use Mark Price in Find, Trailing, or Gap checks.</li>
+          <li>Use the customer's exact UTC timestamps whenever possible. For live/open cases, use Present Time only for the end of the range.</li>
+          <li>After clicking Lookup, copy the generated result only after checking that symbol, market, price source, and period match the case.</li>
+        </ul>
+      </div>
       <ol class="flow">
         <li><div><strong>Select market.</strong> Use Futures when the order belongs to Futures. Use Spot only for spot-market checks. Futures can compare both Mark Price and Last Price.</div></li>
         <li><div><strong>Select a mode.</strong> Trigger, Range, Find, Trailing, Last 1s, and Gap each answer a different investigation question.</div></li>
@@ -397,6 +447,7 @@
       </ol>
 
       <h3>Trigger Mode</h3>
+      <div class="mode-card"><b>Use this mode when:</b> the case asks what the 1 minute candle showed at the trigger timestamp. It is best for stop/take-profit cases where the customer gives a single execution or trigger time.</div>
       <div class="shot-wrap">
         <img src="feature-guide-assets/price-lookup-trigger.png" alt="Price Lookup Trigger mode screenshot">
         <span class="pin green" style="--x:31%;--y:22%">1</span>
@@ -424,6 +475,7 @@
       </div>
 
       <h3>Range Mode</h3>
+      <div class="mode-card"><b>Use this mode when:</b> the agent needs the highest and lowest price during a period, usually to summarize market movement between order placement and cancellation/expiry.</div>
       <div class="shot-wrap">
         <img src="feature-guide-assets/price-lookup-range.png" alt="Price Lookup Range mode screenshot">
         <span class="pin" style="--x:31%;--y:30%">1</span>
@@ -441,6 +493,7 @@
       </div>
 
       <h3>Find Mode</h3>
+      <div class="mode-card"><b>Use this mode when:</b> the customer asks whether a specific price level was reached. The output tells the agent either the first touch time or the closest miss.</div>
       <div class="shot-wrap">
         <img src="feature-guide-assets/price-lookup-find.png" alt="Price Lookup Find mode screenshot">
         <span class="pin" style="--x:43%;--y:30%">1</span>
@@ -456,6 +509,7 @@
       </div>
 
       <h3>Trailing Mode</h3>
+      <div class="mode-card"><b>Use this mode when:</b> a trailing stop complaint needs a step-by-step explanation of activation, peak/trough tracking, callback percentage, and final trigger status.</div>
       <div class="shot-wrap">
         <img src="feature-guide-assets/price-lookup-trailing.png" alt="Price Lookup Trailing mode screenshot">
         <span class="pin" style="--x:56%;--y:30%">1</span>
@@ -477,6 +531,7 @@
       </div>
 
       <h3>Last 1s and Gap Modes</h3>
+      <div class="mode-card"><b>Use these modes when:</b> Last 1s is for exact one-second trade evidence; Gap is for explaining why a chart based on Last Price can differ from a Mark Price-triggered order.</div>
       <div class="split">
         <div>
           <div class="shot-wrap">
@@ -523,6 +578,15 @@
     <section class="section">
       <h2>Funding Macro</h2>
       <p>Funding Macro builds a customer-ready explanation from funding time, position size, side, interval, output mode, and tone.</p>
+      <div class="agent-panel">
+        <strong>Agent workflow for Funding Macro</strong>
+        <ul>
+          <li>Enter the exact symbol, funding time, position size, side, and funding interval from the customer's case.</li>
+          <li>Use Detailed / Professional when the customer needs evidence; use Summary for shorter replies.</li>
+          <li>Generate first, then use Apply Precision if the reply needs Binance symbol precision applied to the mark price.</li>
+          <li>Copy is intentionally disabled until a macro exists, so agents cannot copy an empty answer.</li>
+        </ul>
+      </div>
       <div class="shot-wrap">
         <img src="feature-guide-assets/funding-macro.png" alt="Funding Macro screenshot">
         <span class="pin blue" style="--x:31%;--y:24%">1</span>
@@ -557,6 +621,15 @@
     <section class="section">
       <h2>Position History Open & Close Price Calc.</h2>
       <p>This tab parses Binance order history rows and generates average entry and close explanations for support replies.</p>
+      <div class="agent-panel">
+        <strong>Agent workflow for Position History Calculator</strong>
+        <ul>
+          <li>Paste the raw Binance order history rows directly into the input area. Parsing runs automatically.</li>
+          <li>Use LONG or SHORT only to guide one-way interpretation. Hedge-mode rows with LONG/SHORT/BOTH are detected from the pasted data.</li>
+          <li>Check the extracted trade count before copying. If the status says 0 trades, the pasted rows are not in a parseable format.</li>
+          <li>Use Copy Full Explanation when the parsed summary matches the customer's symbol and position flow.</li>
+        </ul>
+      </div>
       <div class="shot-wrap">
         <img src="feature-guide-assets/average-calculator.png" alt="Position History calculator screenshot">
         <span class="pin green" style="--x:19%;--y:26%">1</span>
@@ -586,6 +659,15 @@
       <h2>Margin Restrictions</h2>
       <p>This tab checks Binance Margin restriction data from <code>GET /sapi/v1/margin/restricted-asset</code>. It is designed so agents do not need to provide an API key manually. The app uses the configured shared/default key path, and agents should simply refresh or search the asset.</p>
       <div class="note">Restriction meaning: <code>openLongRestrictedAsset</code> means Binance Margin Buy (Long) Risk Control is active. Users may be blocked from opening or increasing long positions, while close position and repay flows remain allowed. <code>maxCollateralExceededAsset</code> means the platform-wide collateral cap is reached, so additional transfers into cross margin as collateral can be blocked.</div>
+      <div class="agent-panel">
+        <strong>Agent workflow for Margin Restrictions</strong>
+        <ul>
+          <li>Confirm the shared/default API key status is active, then use Refresh to pull the latest Binance list.</li>
+          <li>Use Restriction Check for a single customer asset and copy the generated reply.</li>
+          <li>Use Full List when the agent needs to scan or filter all restricted assets.</li>
+          <li>Use Changes only to see whether restrictions were added or removed after refresh comparisons.</li>
+        </ul>
+      </div>
 
       <h3>Restriction Check</h3>
       <div class="shot-wrap">
