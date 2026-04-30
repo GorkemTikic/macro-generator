@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FD Macro Generator - Feature Guide</title>
+<style>
+  @page { size: A4; margin: 14mm; }
+  * { box-sizing: border-box; }
+  :root {
+    --ink: #111827;
+    --muted: #64748b;
+    --line: #dbe3ef;
+    --soft: #f8fafc;
+    --blue: #2563eb;
+    --green: #059669;
+    --amber: #b45309;
+    --red: #dc2626;
+    --purple: #7c3aed;
+    --dark: #0f172a;
+  }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+    background: white;
+    line-height: 1.45;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  h1, h2, h3, h4 { margin: 0; line-height: 1.15; }
+  h1 { font-size: 36px; color: white; }
+  h2 { font-size: 24px; color: var(--dark); margin-bottom: 10px; }
+  h3 { font-size: 17px; color: var(--dark); margin-bottom: 6px; }
+  h4 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
+  p { margin: 6px 0; }
+  code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    background: #eef2ff;
+    color: #3730a3;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .cover {
+    min-height: 265mm;
+    padding: 34mm 22mm 20mm;
+    background:
+      radial-gradient(circle at 85% 12%, rgba(0, 229, 168, .28), transparent 28%),
+      radial-gradient(circle at 12% 72%, rgba(59, 130, 246, .30), transparent 30%),
+      linear-gradient(135deg, #061118 0%, #0f172a 52%, #123b69 100%);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    page-break-after: always;
+  }
+  .cover .eyebrow {
+    color: #7dd3fc;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    font-size: 12px;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+  .cover .sub {
+    color: #cbd5e1;
+    font-size: 16px;
+    max-width: 680px;
+    margin-top: 16px;
+  }
+  .cover .meta {
+    color: #94a3b8;
+    border-top: 1px solid rgba(255,255,255,.18);
+    padding-top: 18px;
+    font-size: 12px;
+  }
+  .page {
+    page-break-after: always;
+    padding-bottom: 10px;
+  }
+  .page:last-child { page-break-after: auto; }
+  .lede {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-left: 5px solid var(--blue);
+    padding: 12px 14px;
+    border-radius: 8px;
+    margin: 10px 0 16px;
+  }
+  .mini-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-top: 16px;
+  }
+  .mini-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--soft);
+    padding: 12px;
+    min-height: 105px;
+  }
+  .mini-card b { display: block; color: var(--dark); margin-bottom: 4px; }
+  .mini-card span { color: var(--muted); font-size: 12px; }
+  .tabs-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 12px 0 16px;
+  }
+  .tab-pill {
+    padding: 7px 11px;
+    border-radius: 8px;
+    background: #1e293b;
+    color: #dbeafe;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .tab-pill.active {
+    background: linear-gradient(135deg, #00e5a8, #3b82f6);
+    color: #061118;
+  }
+  .visual {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff, #f8fafc);
+    padding: 14px;
+    margin: 14px 0;
+    min-height: 220px;
+    overflow: hidden;
+  }
+  .mock {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #0f172a;
+    color: #e5e7eb;
+    padding: 14px;
+    box-shadow: 0 8px 24px rgba(15,23,42,.16);
+  }
+  .mock-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 800;
+    margin-bottom: 12px;
+  }
+  .mock-tabs {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .mock-tabs.six { grid-template-columns: repeat(6, 1fr); }
+  .mock-tabs.three { grid-template-columns: repeat(3, 1fr); }
+  .mock-tabs.two { grid-template-columns: repeat(2, 1fr); }
+  .mock-tab {
+    border: 1px solid rgba(255,255,255,.12);
+    background: #111827;
+    border-radius: 7px;
+    padding: 8px 6px;
+    text-align: center;
+    color: #93c5fd;
+    font-size: 11px;
+  }
+  .mock-tab.on {
+    background: rgba(0,229,168,.13);
+    border-color: #00e5a8;
+    color: #5eead4;
+  }
+  .mock-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .field {
+    background: #020617;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 7px;
+    padding: 9px;
+    min-height: 38px;
+    font-family: Consolas, "Courier New", monospace;
+    color: #f8fafc;
+    font-size: 12px;
+  }
+  .field.full { grid-column: 1 / -1; }
+  .button {
+    display: inline-block;
+    background: linear-gradient(135deg, #00e5a8, #3b82f6);
+    color: #031015;
+    font-weight: 900;
+    border-radius: 8px;
+    padding: 9px 14px;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+  .callouts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .callout {
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 10px 12px;
+    background: white;
+  }
+  .callout b {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 4px;
+  }
+  .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    background: var(--blue);
+    color: white;
+    font-size: 12px;
+    font-weight: 900;
+    flex: none;
+  }
+  .num.green { background: var(--green); }
+  .num.amber { background: var(--amber); }
+  .num.red { background: var(--red); }
+  .num.purple { background: var(--purple); }
+  .arrow-flow {
+    display: grid;
+    grid-template-columns: 1fr 30px 1fr 30px 1fr;
+    align-items: stretch;
+    gap: 8px;
+    margin: 12px 0;
+  }
+  .flow-box {
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: white;
+    padding: 10px;
+  }
+  .arrow {
+    align-self: center;
+    text-align: center;
+    font-size: 24px;
+    color: var(--blue);
+    font-weight: 900;
+  }
+  .example {
+    background: #0b1220;
+    color: #dbeafe;
+    border-radius: 10px;
+    padding: 13px 15px;
+    margin-top: 10px;
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    border-left: 5px solid #00e5a8;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10px 0 14px;
+    font-size: 12px;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 8px;
+    vertical-align: top;
+    text-align: left;
+  }
+  th {
+    background: var(--dark);
+    color: white;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .split {
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 14px;
+  }
+  .note {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 8px;
+  }
+  .legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 8px 0 12px;
+  }
+  .legend span {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 11px;
+    background: #eef2ff;
+    color: #3730a3;
+    font-weight: 700;
+  }
+  .footer {
+    font-size: 11px;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+    margin-top: 14px;
+  }
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <div>
+    <div class="eyebrow">FD / SL Internal Guide</div>
+    <h1>FD Macro Generator<br/>Feature Guide</h1>
+    <p class="sub">Macro Generator sekmesi hariç tüm yardımcı tab'ların ne zaman, nasıl ve hangi örnek cevapla kullanılacağını gösteren görsel rehber.</p>
+  </div>
+  <div class="meta">
+    Kapsam: Price Lookup, Funding Macro, Position History Open & Close Price Calc., Margin Restrictions<br/>
+    Format: Görsel açıklama + örnek input + örnek agent cevabı<br/>
+    Hazırlanma tarihi: 30 Nisan 2026
+  </div>
+</section>
+
+<section class="page">
+  <h2>Bu guide ne için?</h2>
+  <div class="lede">
+    Bu doküman agent'ların "hangi sekmeyi hangi müşteri sorusunda kullanmalıyım?" sorusuna hızlı cevap verir. Her bölümde sekmenin amacı, alanların anlamı, akış okları ve örnek destek cevabı bulunur.
+  </div>
+  <div class="tabs-row">
+    <span class="tab-pill">Macro Generator</span>
+    <span class="tab-pill active">Price Lookup</span>
+    <span class="tab-pill active">Funding Macro</span>
+    <span class="tab-pill active">Position History Open & Close Price Calc.</span>
+    <span class="tab-pill active">Margin Restrictions</span>
+  </div>
+  <div class="mini-grid">
+    <div class="mini-card">
+      <b>Price Lookup</b>
+      <span>Mark/Last fiyat kontrolü, hedef fiyat teması, trailing stop ve gap açıklaması.</span>
+    </div>
+    <div class="mini-card">
+      <b>Funding Macro</b>
+      <span>Funding fee açıklamasını saat, oran, mark price ve pozisyon büyüklüğü ile hazırlar.</span>
+    </div>
+    <div class="mini-card">
+      <b>Average Calculator</b>
+      <span>Pozisyon geçmişinden ortalama açılış ve kapanış fiyatlarını hesaplar.</span>
+    </div>
+    <div class="mini-card">
+      <b>Margin Restrictions</b>
+      <span>Margin buy-long risk kontrolü ve maximum collateral limit durumlarını açıklar.</span>
+    </div>
+  </div>
+
+  <h3 style="margin-top:22px">Hızlı karar ağacı</h3>
+  <div class="arrow-flow">
+    <div class="flow-box"><b>Müşteri "fiyat gördüm" diyorsa</b><br/>Price Lookup</div>
+    <div class="arrow">›</div>
+    <div class="flow-box"><b>Müşteri funding fee soruyorsa</b><br/>Funding Macro</div>
+    <div class="arrow">›</div>
+    <div class="flow-box"><b>Müşteri open/close ortalaması soruyorsa</b><br/>Average Calculator</div>
+  </div>
+  <div class="arrow-flow">
+    <div class="flow-box"><b>Müşteri long/buy veya collateral restriction görüyorsa</b><br/>Margin Restrictions</div>
+    <div class="arrow">›</div>
+    <div class="flow-box"><b>Copy reply hazırla</b><br/>Cevabı ticket'a yapıştırmadan önce tarih, sembol ve fiyatları kontrol et.</div>
+    <div class="arrow">›</div>
+    <div class="flow-box"><b>FAQ ekle</b><br/>Sadece ilgili sekmenin verdiği doğru FAQ bağlantısını kullan.</div>
+  </div>
+  <div class="footer">Not: Admin tab bu guide kapsamına alınmadı. Bu doküman agent kullanım akışlarına odaklanır.</div>
+</section>
+
+<section class="page">
+  <h2>1. Price Lookup</h2>
+  <div class="lede">
+    Kullanım amacı: Bir fiyatın gerçekten görülüp görülmediğini, hangi fiyat türünde görüldüğünü ve order trigger mantığına göre neden gerçekleşip gerçekleşmediğini açıklamak.
+  </div>
+  <div class="visual">
+    <div class="mock">
+      <div class="mock-title"><span>Price Lookup</span><span>BTCUSDT</span></div>
+      <div class="mock-tabs six">
+        <div class="mock-tab on">Trigger</div>
+        <div class="mock-tab">Range</div>
+        <div class="mock-tab">Find</div>
+        <div class="mock-tab">Trailing</div>
+        <div class="mock-tab">Last 1s</div>
+        <div class="mock-tab">Gap</div>
+      </div>
+      <div class="mock-grid">
+        <div class="field">Market: Futures / Spot</div>
+        <div class="field">Symbol: BTCUSDT</div>
+        <div class="field full">Time or Range: YYYY-MM-DD HH:MM:SS</div>
+        <div class="field">Price Type: Last / Mark</div>
+        <div class="field">Target Price: optional by mode</div>
+      </div>
+      <span class="button">Lookup</span>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><b><span class="num">1</span> Market seçimi</b>Futures için Mark Price ve Last Price karşılaştırması yapılabilir. Spot tarafında Mark Price yoktur, Last Price kullanılır.</div>
+    <div class="callout"><b><span class="num">2</span> Mode seçimi</b>Trigger, Range, Find, Trailing, Last 1s ve Gap Explainer farklı müşteri sorularına cevap verir.</div>
+    <div class="callout"><b><span class="num green">3</span> Zaman aralığı</b>Tüm zamanlar UTC+0 formatında girilmelidir. Örnek: <code>2026-04-30 12:45:00</code>.</div>
+    <div class="callout"><b><span class="num amber">4</span> Sonuç kutusu</b>Çıktı agent'ın ticket'a uyarlayabileceği teknik özet olarak gelir.</div>
+  </div>
+
+  <h3>Mode'lar ne zaman kullanılır?</h3>
+  <table>
+    <thead><tr><th>Mode</th><th>Ne için?</th><th>Örnek müşteri sorusu</th></tr></thead>
+    <tbody>
+      <tr><td><b>Trigger</b></td><td>Belirli dakikanın 1m OHLC verisini gösterir.</td><td>"Emrim bu dakikada neden tetiklendi?"</td></tr>
+      <tr><td><b>Range</b></td><td>Bir aralıkta görülen zirve, dip ve volatiliteyi verir.</td><td>"Bu aralıkta fiyat en fazla kaçı gördü?"</td></tr>
+      <tr><td><b>Find</b></td><td>Hedef fiyatın görülüp görülmediğini arar. Görülmediyse closest miss verir.</td><td>"Grafik 95,000'e geldi ama emrim neden çalışmadı?"</td></tr>
+      <tr><td><b>Trailing</b></td><td>Activation price, peak/trough ve callback rate ile trailing stop akışını simüle eder.</td><td>"Trailing stop neden tetiklenmedi?"</td></tr>
+      <tr><td><b>Last 1s</b></td><td>Son 7 gün içinde saniyelik aggTrades datası ile Last Price detayını verir.</td><td>"O saniyede gerçekten trade var mıydı?"</td></tr>
+      <tr><td><b>Gap Explainer</b></td><td>Mark Price ve Last Price farkını karşılaştırır.</td><td>"Chart dokundu ama mark price order'ım neden tetiklenmedi?"</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Örnek cevap</h3>
+  <div class="example">Symbol: BTCUSDT | Market: Futures
+Period: 2026-04-30 12:00:00 -> 2026-04-30 13:00:00 UTC+0
+
+Support summary:
+The target price was reached on Last Price, but Mark Price did not reach the same level in the selected period. If the order was configured to trigger by Mark Price, the chart's Last Price touch would not be enough to trigger it.</div>
+</section>
+
+<section class="page">
+  <h2>2. Funding Macro</h2>
+  <div class="lede">
+    Kullanım amacı: Müşterinin funding fee kesintisi veya funding payment sorusuna, Binance funding kaydı ve mark price verisiyle tutarlı açıklama hazırlamak.
+  </div>
+  <div class="split">
+    <div>
+      <div class="visual">
+        <div class="mock">
+          <div class="mock-title"><span>Funding Macro</span><span>Detailed / Summary</span></div>
+          <div class="mock-grid">
+            <div class="field">Symbol: ORCAUSDT</div>
+            <div class="field">Funding Time: 2026-04-30 08:00:00</div>
+            <div class="field">Position Size: 125</div>
+            <div class="field">Side: Long / Short</div>
+            <div class="field">Interval: 8</div>
+            <div class="field">Tone: Standard / Professional</div>
+          </div>
+          <span class="button">Generate Funding Macro</span>
+        </div>
+      </div>
+    </div>
+    <div>
+      <h3>Alanlar</h3>
+      <div class="callout"><b><span class="num">1</span> Funding Time</b>Funding kaydına yakın zaman girilir. Sistem en yakın funding record'u bulur.</div>
+      <div class="callout"><b><span class="num green">2</span> Position Size</b>Funding hesaplamasında kullanılacak pozisyon büyüklüğüdür.</div>
+      <div class="callout"><b><span class="num amber">3</span> Apply Binance Precision</b>Sonradan exchangeInfo fiyat hassasiyetine göre mark price truncate eder. Yuvarlama değil, Binance tarzı kesme uygulanır.</div>
+    </div>
+  </div>
+
+  <h3>Akış</h3>
+  <div class="arrow-flow">
+    <div class="flow-box"><b>1. Funding kaydı bulunur</b><br/>`fundingRate` endpoint'e yakın kayıt aranır.</div>
+    <div class="arrow">›</div>
+    <div class="flow-box"><b>2. Mark price tamamlanır</b><br/>Funding kaydında yoksa 1m mark close fallback alınır.</div>
+    <div class="arrow">›</div>
+    <div class="flow-box"><b>3. Macro üretilir</b><br/>Detailed veya Summary moduna göre cevap hazırlanır.</div>
+  </div>
+
+  <h3>Örnek cevap</h3>
+  <div class="example">Funding Time: 2026-04-30 08:00:00 UTC+0
+Symbol: ORCAUSDT
+Funding Rate: 0.0100%
+Position Side: Long
+
+The funding fee was calculated based on your position size and the funding rate recorded at the funding time. Since the position was Long, a positive funding rate means the long side pays funding to the short side.</div>
+</section>
+
+<section class="page">
+  <h2>3. Position History Open & Close Price Calc.</h2>
+  <div class="lede">
+    Kullanım amacı: Binance position/order history paste datasından ortalama açılış fiyatı, ortalama kapanış fiyatı, partial close, full close ve flip durumlarını hızlı hesaplamak.
+  </div>
+  <div class="visual">
+    <div class="mock">
+      <div class="mock-title"><span>Position History Open & Close Price Calc.</span><span>LONG / SHORT</span></div>
+      <div class="mock-tabs two">
+        <div class="mock-tab on">LONG</div>
+        <div class="mock-tab">SHORT</div>
+      </div>
+      <div class="mock-grid">
+        <div class="field full" style="min-height:88px">Paste position history here...
+2026-04-30 10:00:00 BTCUSDT BUY 0.1000 64000
+2026-04-30 10:30:00 BTCUSDT SELL 0.0500 64500</div>
+        <div class="field">Status: parsed trades</div>
+        <div class="field">Grouped result: BTCUSDT</div>
+      </div>
+      <span class="button">Copy Complete Answer</span>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><b><span class="num">1</span> LONG / SHORT seçimi</b>One-way pozisyon geçmişinde seçilen yön hesap mantığını belirler. Hedge mode varsa paste içindeki LONG/SHORT/BOTH bilgisi de dikkate alınır.</div>
+    <div class="callout"><b><span class="num green">2</span> Paste alanı</b>Binance history satırları yapıştırılır. Sistem tarih, side, fiyat, quantity ve order id adaylarını ayrıştırır.</div>
+    <div class="callout"><b><span class="num amber">3</span> Merged fills</b>Aynı order id veya aynı tarih/side ile gelen fill'ler tek işlem gibi konsolide edilir.</div>
+    <div class="callout"><b><span class="num red">4</span> Flip detection</b>Bir emir eski pozisyonu kapatıp kalan miktarla ters pozisyon açarsa guide bunu ayrıca vurgular.</div>
+  </div>
+
+  <h3>Ne zaman kullanılır?</h3>
+  <table>
+    <thead><tr><th>Durum</th><th>Bu tab'ın cevabı</th></tr></thead>
+    <tbody>
+      <tr><td>Müşteri "ortalama açılış fiyatım ne?" diyor.</td><td>Entry fills üzerinden weighted average entry hesaplar.</td></tr>
+      <tr><td>Müşteri "kapatma ortalamam ne?" diyor.</td><td>Close fills üzerinden weighted average close hesaplar.</td></tr>
+      <tr><td>Pozisyon parça parça kapanmış.</td><td>Reduced / Closed ayrımı ile her adımı açıklar.</td></tr>
+      <tr><td>Position flip olmuş.</td><td>Eski pozisyonun kapanan miktarını ve yeni açılan miktarı ayrı gösterir.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Örnek cevap</h3>
+  <div class="example">[LONG Position Expanded] Order ID: 123456789 - 0.0500 amount of BTCUSDT was bought to expand the position at 64000.
+New average entry price: 64125.00000000
+
+[LONG Position Reduced] Order ID: 123456790 - 0.0300 amount of BTCUSDT was sold to reduce the position at 64500.
+New average close price: 64500.00000000</div>
+</section>
+
+<section class="page">
+  <h2>4. Margin Restrictions</h2>
+  <div class="lede">
+    Kullanım amacı: Binance Margin tarafında buy-long risk control ve maximum collateral limit kaynaklı kısıtları agent'ın doğru FAQ ve doğru açıklama ile cevaplamasını sağlamak.
+  </div>
+  <div class="visual">
+    <div class="mock">
+      <div class="mock-title"><span>Margin Restrictions</span><span>Server-side API key active</span></div>
+      <div class="mock-tabs three">
+        <div class="mock-tab on">Restriction Check</div>
+        <div class="mock-tab">Full List</div>
+        <div class="mock-tab">Changes</div>
+      </div>
+      <div class="mock-grid">
+        <div class="field full">Asset: YFI</div>
+        <div class="field">Buy Long restricted: 0</div>
+        <div class="field">Max collateral exceeded: 161</div>
+      </div>
+      <span class="button">Refresh</span>
+    </div>
+  </div>
+  <div class="callouts">
+    <div class="callout"><b><span class="num">1</span> Restriction Check</b>Tek coin kontrolü yapar ve copy-paste customer reply üretir.</div>
+    <div class="callout"><b><span class="num red">2</span> Buy Long restricted</b>Open/increase long kısıtlıdır. Reduce-only ve close position akışı halen mümkündür.</div>
+    <div class="callout"><b><span class="num amber">3</span> Max collateral exceeded</b>Varlık platform maximum collateral limitine takılmıştır. Yeni collateral transferi kısıtlanabilir.</div>
+    <div class="callout"><b><span class="num purple">4</span> FAQ butonları</b>Risk control ve max collateral için ayrı doğru FAQ bağlantısı gösterilir.</div>
+  </div>
+
+  <h3>İki farklı kısıt türü</h3>
+  <table>
+    <thead><tr><th>Kısıt</th><th>Anlamı</th><th>Doğru FAQ</th></tr></thead>
+    <tbody>
+      <tr><td><b>Margin Buy (Long) Restricted</b></td><td>Yeni long açma veya long artırma kısıtlı olabilir. Buy market reduce-only olarak net liabilities tutarıyla sınırlanır.</td><td>Binance Cross Margin Trading Risk Control</td></tr>
+      <tr><td><b>Max Collateral Exceeded</b></td><td>Asset platform-wide maximum collateral threshold'a ulaşmıştır. Ek collateral transferi kısıtlanabilir.</td><td>Maximum Collateral Limit for Margin Assets</td></tr>
+      <tr><td><b>Both</b></td><td>İki durum da aktifse agent iki FAQ'yu da paylaşmalıdır.</td><td>Risk Control + Maximum Collateral</td></tr>
+    </tbody>
+  </table>
+
+  <h3>Örnek cevap</h3>
+  <div class="example">YFI has reached Binance's platform-wide maximum collateral threshold. No additional YFI can be transferred into the cross-margin account as collateral until the cap frees up.
+
+Your existing YFI balance in margin still functions normally: trading, borrowing, and closing positions are unaffected.
+
+More info:
+Maximum Collateral Limit for Margin Assets
+https://www.binance.com/en/support/faq/detail/dca77ef963294b368b5ebad0affeda09</div>
+</section>
+
+<section class="page">
+  <h2>Agent için hızlı kullanım özeti</h2>
+  <table>
+    <thead><tr><th>Müşteri sorusu</th><th>Kullanılacak tab</th><th>Kontrol edilecek alan</th><th>Cevap tipi</th></tr></thead>
+    <tbody>
+      <tr><td>"Fiyat bu seviyeye geldi mi?"</td><td>Price Lookup</td><td>Find + Last/Mark seçimi</td><td>Reached / closest miss</td></tr>
+      <tr><td>"Grafikte dokundu ama order çalışmadı."</td><td>Price Lookup</td><td>Gap Explainer</td><td>Mark vs Last farkı</td></tr>
+      <tr><td>"Trailing stop neden tetiklenmedi?"</td><td>Price Lookup</td><td>Trailing</td><td>Activation, peak/trough, callback</td></tr>
+      <tr><td>"Funding fee neden böyle?"</td><td>Funding Macro</td><td>Funding time, side, size</td><td>Funding explanation macro</td></tr>
+      <tr><td>"Open/close average price ne?"</td><td>Average Calculator</td><td>Paste history + LONG/SHORT</td><td>Weighted average answer</td></tr>
+      <tr><td>"Bu coin margin'de neden kısıtlı?"</td><td>Margin Restrictions</td><td>Restriction Check</td><td>Risk control veya collateral FAQ</td></tr>
+    </tbody>
+  </table>
+  <div class="footer">
+    Bu guide canlı uygulamadaki mevcut tab yapısına göre hazırlandı. Macro Generator tab'ı özellikle kapsam dışı bırakıldı.
+  </div>
+</section>
+
+</body>
+</html>
