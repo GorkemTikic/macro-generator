@@ -247,10 +247,20 @@ export function getCached(): CachedPayload | null {
 //   No more of it can be brought into the margin account as collateral until the cap
 //   frees up. Existing balances and trading are unaffected.
 //
-// Ref: https://www.binance.com/en/support/faq/detail/0ec778021b7a4f14b1b334f74b764b77
+// Refs:
+//   Maximum Collateral Limit for Margin Assets:
+//   https://www.binance.com/en/support/faq/detail/dca77ef963294b368b5ebad0affeda09
+//   Binance Cross Margin Trading Risk Control:
+//   https://www.binance.com/en/support/faq/detail/b83f0a71a1b448aaaad5e970a9936472
 // ---------------------------------------------------------------------------
 
-const FAQ_URL = "https://www.binance.com/en/support/faq/detail/0ec778021b7a4f14b1b334f74b764b77";
+const MAX_COLLATERAL_FAQ_URL = "https://www.binance.com/en/support/faq/detail/dca77ef963294b368b5ebad0affeda09";
+const RISK_CONTROL_FAQ_URL = "https://www.binance.com/en/support/faq/detail/b83f0a71a1b448aaaad5e970a9936472";
+
+export type FaqLink = {
+  label: string;
+  url: string;
+};
 
 export type AssetRestriction = {
   asset: string;
@@ -260,6 +270,7 @@ export type AssetRestriction = {
   plainEnglish: string;
   customerReply: string;
   faqUrl: string;
+  faqLinks: FaqLink[];
   // kept for backward compat with the UI canTransferIn check
   canTransferIn: boolean;
 };
@@ -280,7 +291,8 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): AssetR
       reasonCode: "NONE",
       plainEnglish: "Enter an asset symbol to check restriction status.",
       customerReply: "",
-      faqUrl: FAQ_URL,
+      faqUrl: RISK_CONTROL_FAQ_URL,
+      faqLinks: [],
     };
   }
 
@@ -296,7 +308,8 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): AssetR
         `reduce-only trades up to net liabilities are allowed. Close position and repay debt flows ` +
         `are still permitted.`,
       customerReply: buildReply(a, "BOTH"),
-      faqUrl: FAQ_URL,
+      faqUrl: RISK_CONTROL_FAQ_URL,
+      faqLinks: faqLinksFor("BOTH"),
     };
   }
 
@@ -313,7 +326,8 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): AssetR
         `net liabilities of ${a} (Total Debt − Total Asset). If net liabilities ≤ 0, buy orders ` +
         `are rejected. Close position and repay debt flows are still allowed.`,
       customerReply: buildReply(a, "OPEN_LONG_RESTRICTED"),
-      faqUrl: FAQ_URL,
+      faqUrl: RISK_CONTROL_FAQ_URL,
+      faqLinks: faqLinksFor("OPEN_LONG_RESTRICTED"),
     };
   }
 
@@ -328,7 +342,8 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): AssetR
         `${a} can be transferred into the cross-margin account as collateral until the cap frees ` +
         `up. Existing ${a} balance, trading, and borrowing are unaffected.`,
       customerReply: buildReply(a, "MAX_COLLATERAL_EXCEEDED"),
-      faqUrl: FAQ_URL,
+      faqUrl: MAX_COLLATERAL_FAQ_URL,
+      faqLinks: faqLinksFor("MAX_COLLATERAL_EXCEEDED"),
     };
   }
 
@@ -339,8 +354,22 @@ export function diagnoseTransfer(asset: string, data: RestrictedPayload): AssetR
     reasonCode: "NONE",
     plainEnglish: `${a} has no active Binance Margin restrictions at this time. Long positions and collateral transfers are allowed.`,
     customerReply: "",
-    faqUrl: FAQ_URL,
+    faqUrl: RISK_CONTROL_FAQ_URL,
+    faqLinks: [],
   };
+}
+
+function faqLinksFor(code: "OPEN_LONG_RESTRICTED" | "MAX_COLLATERAL_EXCEEDED" | "BOTH"): FaqLink[] {
+  if (code === "OPEN_LONG_RESTRICTED") {
+    return [{ label: "Risk Control FAQ", url: RISK_CONTROL_FAQ_URL }];
+  }
+  if (code === "MAX_COLLATERAL_EXCEEDED") {
+    return [{ label: "Max Collateral FAQ", url: MAX_COLLATERAL_FAQ_URL }];
+  }
+  return [
+    { label: "Risk Control FAQ", url: RISK_CONTROL_FAQ_URL },
+    { label: "Max Collateral FAQ", url: MAX_COLLATERAL_FAQ_URL },
+  ];
 }
 
 function buildReply(asset: string, code: "OPEN_LONG_RESTRICTED" | "MAX_COLLATERAL_EXCEEDED" | "BOTH"): string {
@@ -355,7 +384,7 @@ function buildReply(asset: string, code: "OPEN_LONG_RESTRICTED" | "MAX_COLLATERA
       `buy orders will be rejected.\n` +
       `• Close position (sell / reduce long) and repay debt flows are still fully allowed.\n\n` +
       `This restriction is temporary and will be lifted once Binance determines that market conditions ` +
-      `have stabilised. More info: ${FAQ_URL}`
+      `have stabilised. More info: ${RISK_CONTROL_FAQ_URL}`
     );
   }
   if (code === "MAX_COLLATERAL_EXCEEDED") {
@@ -368,7 +397,7 @@ function buildReply(asset: string, code: "OPEN_LONG_RESTRICTED" | "MAX_COLLATERA
       `• Your existing ${asset} balance in margin still functions normally: trading, borrowing, and ` +
       `closing positions are unaffected.\n\n` +
       `You can wait for Binance to lift the cap, or use a different asset for your transfer. ` +
-      `More info: ${FAQ_URL}`
+      `More info: ${MAX_COLLATERAL_FAQ_URL}`
     );
   }
   // BOTH
@@ -379,7 +408,9 @@ function buildReply(asset: string, code: "OPEN_LONG_RESTRICTED" | "MAX_COLLATERA
     `• Opening or increasing long positions in ${asset} is restricted (reduce-only, capped at net liabilities).\n` +
     `• No additional ${asset} can be transferred in as collateral.\n` +
     `• Close position and repay debt are still allowed.\n\n` +
-    `More info: ${FAQ_URL}`
+    `More info:\n` +
+    `Risk Control: ${RISK_CONTROL_FAQ_URL}\n` +
+    `Maximum Collateral Limit: ${MAX_COLLATERAL_FAQ_URL}`
   );
 }
 

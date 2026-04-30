@@ -311,15 +311,18 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
                       <button className="tab" type="button" onClick={copyReply}>
                         📋 {isTr ? "Yanıtı Kopyala" : "Copy Reply"}
                       </button>
-                      <a
-                        className="tab"
-                        href={diagnosis.faqUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ textDecoration: "none", display: "flex", alignItems: "center" }}
-                      >
-                        🔗 {isTr ? "FAQ Aç" : "Open FAQ"}
-                      </a>
+                      {(diagnosis.faqLinks.length ? diagnosis.faqLinks : [{ label: "FAQ", url: diagnosis.faqUrl }]).map(link => (
+                        <a
+                          key={link.url}
+                          className="tab"
+                          href={link.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ textDecoration: "none", display: "flex", alignItems: "center" }}
+                        >
+                          🔗 {isTr ? "FAQ Aç" : link.label}
+                        </a>
+                      ))}
                     </div>
                   </>
                 )}
