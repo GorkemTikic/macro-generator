@@ -27,6 +27,7 @@ export default function PriceLookup({ lang, uiStrings }) {
   const [direction, setDirection] = useState("short"); // "short" | "long"
   const [gapTriggerType, setGapTriggerType] = useState(""); // "" | "MARK" | "LAST"
   const [result, setResult] = useState("");
+  const [trailingResult, setTrailingResult] = useState<any>(null);
   const [error, setError] = useState("");
 
   const t = uiStrings; // Çeviri metinleri
@@ -40,8 +41,138 @@ export default function PriceLookup({ lang, uiStrings }) {
     setTo(formatted);
   };
 
+  const fmtPrice = (n) => Number.isFinite(Number(n)) ? Number(n).toFixed(5) : "N/A";
+  const fmtInputPrice = (n) => Number.isFinite(Number(n)) ? String(Number(n)) : "N/A";
+  const fmtPct = (n, decimals = 4) => Number.isFinite(Number(n)) ? `${Number(n).toFixed(decimals)}%` : "N/A";
+  const fmtCallbackDecimal = (n) => Number.isFinite(Number(n)) ? (Number(n) / 100).toString() : "N/A";
+  const cleanUtc = (s) => s ? String(s).replace(" UTC+0", " UTC") : "N/A";
+  const fmtResultTime = (s, isMark) => {
+    const clean = cleanUtc(s);
+    return isMark ? clean.replace(/:\d{2} UTC$/, " UTC") : clean;
+  };
+  const candleMinute = (c) => c?.openTime ? fmtResultTime(new Date(c.openTime).toISOString().slice(0, 19).replace("T", " ") + " UTC+0", true) : "N/A";
+
+  async function copyText(text) {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
+    alert(t.copied || "Copied!");
+  }
+
+  function buildTrailingOutput(data, params) {
+    const isBuy = params.direction === "long";
+    const isMark = data.dataSource === "mark";
+    const sideLabel = isBuy ? "BUY Trailing (short close)" : "SELL Trailing (long close)";
+    const customerSide = isBuy ? "Buy" : "Sell";
+    const referenceName = isBuy ? "lowest point" : "highest point";
+    const referenceTech = isBuy ? "Trough (lowest)" : "Peak (highest)";
+    const movedToActivation = isBuy ? "dropped to" : "rose to";
+    const favorableMove = isBuy ? "continued falling" : "continued rising";
+    const triggerMove = isBuy ? "upward" : "downward";
+    const triggerVerb = isBuy ? "rebound upward" : "move downward";
+    const triggerFormula = isBuy ? "1 +" : "1 -";
+    const conditionOperator = isBuy ? ">=" : "<=";
+    const referencePrice = Number(data.referencePrice ?? data.peakPrice);
+    const requiredPrice = Number(data.triggerPrice);
+    const observedTrigger = Number(data.triggerObservedPrice ?? data.triggerPrice);
+    const activationTime = fmtResultTime(data.activationTime, isMark);
+    const referenceTime = fmtResultTime(data.referenceTime || data.peakTime, isMark);
+    const triggerTime = fmtResultTime(data.triggerTime, isMark);
+    const sourceLabel = data.dataSourceLabel || (isMark ? "Mark Price (1m markPriceKlines)" : "Last Price (1s klines)");
+    const granularityLabel = isMark ? "1m (Mark Price limit)" : data.granularity;
+    const markNote = isMark
+      ? "\n\nPlease note that Mark Price is checked using 1-minute intervals, so the times are shown by minute."
+      : "";
+
+    let customer = "";
+    if (data.status === "not_activated") {
+      customer =
+        `Hi, thank you for your patience.\n\n` +
+        `Your Trailing Stop ${customerSide} order did not activate during the selected time window.\n\n` +
+        `The price did not ${movedToActivation} your activation price of ${fmtInputPrice(params.activationPrice)}, so trailing stop tracking did not start.${markNote}`;
+    } else {
+      customer =
+        `Hi, thank you for your patience.\n\n` +
+        `Your Trailing Stop ${customerSide} order was activated on ${activationTime} when the price ${movedToActivation} your activation price of ${fmtInputPrice(params.activationPrice)}.\n\n` +
+        `After activation, the price ${favorableMove} and reached its ${referenceName} of ${fmtPrice(referencePrice)} at ${referenceTime}.\n\n` +
+        `From that ${referenceName}, the price needed to ${triggerVerb} by ${fmtInputPrice(params.callbackRate)}% (your callback rate) to trigger. This required the price to reach ${fmtPrice(requiredPrice)}.\n\n`;
+
+      if (data.status === "triggered") {
+        customer +=
+          `The price reached ${fmtPrice(requiredPrice)} at ${triggerTime}, which triggered your order as expected.\n\n` +
+          `Everything worked according to the Trailing Stop rules.${markNote}`;
+      } else {
+        customer +=
+          `The price did not reach ${fmtPrice(requiredPrice)} within the selected window, so the order is not shown as triggered in this analysis.${markNote}`;
+      }
+    }
+
+    const reboundLine = data.status === "triggered"
+      ? (isBuy
+        ? `(${fmtPrice(observedTrigger)} - ${fmtPrice(referencePrice)}) / ${fmtPrice(referencePrice)} = ${fmtPct(data.maxObservedCallback)}`
+        : `(${fmtPrice(referencePrice)} - ${fmtPrice(observedTrigger)}) / ${fmtPrice(referencePrice)} = ${fmtPct(data.maxObservedCallback)}`)
+      : `Maximum observed callback = ${fmtPct(data.maxObservedCallback)}`;
+    const conditionLine = isBuy
+      ? `Activation Price (${fmtInputPrice(params.activationPrice)}) >= Lowest Price (${fmtPrice(referencePrice)})`
+      : `Activation Price (${fmtInputPrice(params.activationPrice)}) <= Highest Price (${fmtPrice(referencePrice)})`;
+
+    let agent =
+      `TECHNICAL BREAKDOWN\n\n` +
+      `Data source:       ${sourceLabel}\n` +
+      `Granularity:       ${granularityLabel}\n` +
+      `Symbol:            ${params.symbol}\n` +
+      `Direction:         ${sideLabel}\n\n`;
+
+    if (data.status === "not_activated") {
+      agent +=
+        `Activation:        Not reached within ${params.from} -> ${params.to} UTC\n\n` +
+        `Conditions met:\n` +
+        `  - ${conditionLine}  ❌\n` +
+        `  - Rebound Rate >= Callback Rate (${fmtInputPrice(params.callbackRate)}%)  ❌\n\n` +
+        `Result: Not triggered. Activation condition was not met.`;
+    } else {
+      agent +=
+        `Activation:        ${fmtInputPrice(params.activationPrice)} hit at ${activationTime}\n` +
+        `${referenceTech}:   ${fmtPrice(referencePrice)} at ${referenceTime}\n` +
+        `Required move:     ${fmtPrice(referencePrice)} x (${triggerFormula} ${fmtCallbackDecimal(params.callbackRate)}) = ${fmtPrice(requiredPrice)}\n`;
+
+      if (data.status === "triggered") {
+        agent += `Actual move:       ${fmtPrice(observedTrigger)} hit at ${triggerTime}\n`;
+      } else {
+        agent += `Actual move:       Max observed = ${fmtPct(data.maxObservedCallback)}\n`;
+      }
+
+      agent +=
+        `Rebound %:         ${reboundLine}\n\n` +
+        `Conditions met:\n` +
+        `  - ${conditionLine}  ✅\n` +
+        `  - Rebound Rate (${fmtPct(data.maxObservedCallback)}) >= Callback Rate (${fmtInputPrice(params.callbackRate)}%)  ${data.status === "triggered" ? "✅" : "❌"}\n\n`;
+
+      if (isMark && data.markDetails) {
+        const md = data.markDetails;
+        agent +=
+          `Mark Price candles:\n` +
+          `  - Activation candle: ${candleMinute(md.activationCandle)} low=${fmtPrice(md.activationCandle?.low)} high=${fmtPrice(md.activationCandle?.high)}\n` +
+          `  - ${isBuy ? "Trough" : "Peak"} candle: ${candleMinute(md.referenceCandle)} ${md.referenceExtreme}=${fmtPrice(isBuy ? md.referenceCandle?.low : md.referenceCandle?.high)}\n` +
+          `  - Trigger probe candle: ${candleMinute(md.triggerCandle)} ${md.triggerExtreme}=${fmtPrice(isBuy ? md.triggerCandle?.high : md.triggerCandle?.low)}\n\n`;
+      }
+
+      agent += data.status === "triggered"
+        ? `Result: Trigger valid. Order executed correctly.`
+        : `Result: Not triggered within the selected window.`;
+    }
+
+    return {
+      customer,
+      agent,
+      dataSourceLabel: sourceLabel,
+      granularityLabel,
+      warning: data.markWarning || null,
+    };
+  }
+
   async function handleLookup() {
     setResult("");
+    setTrailingResult(null);
     setError("");
     const errTime = lang === 'tr' ? 'Lütfen bir "Tetiklenme Zamanı" girin.' : 'Please enter a Triggered At timestamp.';
     const errRange = lang === 'tr' ? 'Lütfen Başlangıç ve Bitiş zamanlarını girin.' : 'Please enter both From and To.';
@@ -311,7 +442,50 @@ export default function PriceLookup({ lang, uiStrings }) {
           return setResult(t.lookupNotFound);
         }
 
-        let msg = `## ${data.status === 'triggered' ? t.trailingTriggeredTitle : t.trailingNotTriggeredTitle}\n\n`;
+        const trailingOutput = buildTrailingOutput(data, {
+          symbol: sTrim,
+          from: fTrim,
+          to: tTrim,
+          activationPrice: actPrice,
+          callbackRate: cbRate,
+          direction,
+        });
+        setTrailingResult(trailingOutput);
+        setResult(`${trailingOutput.customer}\n\n---\n\n${trailingOutput.agent}`);
+        track({
+          event: 'trailing_stop_checked',
+          tab: 'lookup',
+          props: {
+            symbol: activeSymbol,
+            direction,
+            market,
+            price_type: priceType,
+            status: data.status,
+            granularity: data.granularity || null,
+            data_source: data.dataSourceLabel || null,
+          },
+        });
+        return;
+
+        // Build the trigger source / granularity disclosure block.
+        // This MUST appear at the top so an agent never reads the result
+        // without knowing what data backed it.
+        const sourceLabel = (() => {
+          if (data.dataSource === 'mark') return t.trailingDataSourceMark;
+          if (data.fellBackTo1m) return t.trailingDataSourceLastLo;
+          return t.trailingDataSourceLastHi;
+        })();
+        const sourceBlock = `> **${t.trailingTriggerSourceLabel}:** ${sourceLabel}\n` +
+          `> **${t.trailingGranularityLabel}:** \`${data.granularity || (data.dataSource === 'mark' ? '1m' : '1s')}\`\n\n`;
+        const approxWarning = data.dataSource === 'mark'
+          ? `${t.trailingMarkApproxWarning}\n\n`
+          : data.fellBackTo1m
+            ? `${t.trailingLastFallbackWarning}\n\n`
+            : '';
+
+        let msg = `## ${data.status === 'triggered' ? t.trailingTriggeredTitle : t.trailingNotTriggeredTitle}\n\n` +
+          sourceBlock +
+          approxWarning;
 
         if (data.isActivated) {
           // STEP 1: Activation
@@ -336,7 +510,8 @@ export default function PriceLookup({ lang, uiStrings }) {
                 ? (lang === 'tr' ? 'Fiyat zirveden yeterince geri çekilerek emri tetikledi.' : 'The price pulled back from the peak enough to trigger.')
                 : (lang === 'tr' ? 'Fiyat alttan (Bottom) yeterince sıçrayarak emri tetikledi.' : 'The price bounced up from the bottom enough to trigger.')}\n` +
               `> 🕒 **${data.triggerTime}**\n` +
-              `> 💵 Triggered at: **${data.triggerPrice?.toFixed(5)}**\n\n`;
+              `> 💵 ${t.trailingTriggerPriceLabel}: **${data.triggerPrice?.toFixed(5)}**\n\n` +
+              `> ${t.trailingFillNote}\n\n`;
           } else {
             msg += `### ${t.trailingResultTrigger}\n` +
               `> ${t.trailingStepNoTriggerDesc}\n\n` +
@@ -375,7 +550,15 @@ export default function PriceLookup({ lang, uiStrings }) {
         track({
           event: 'trailing_stop_checked',
           tab: 'lookup',
-          props: { symbol: activeSymbol, direction, market, price_type: priceType, status: data.status },
+          props: {
+            symbol: activeSymbol,
+            direction,
+            market,
+            price_type: priceType,
+            status: data.status,
+            granularity: data.granularity || null,
+            fell_back_to_1m: !!data.fellBackTo1m,
+          },
         });
       }
 
@@ -736,7 +919,42 @@ export default function PriceLookup({ lang, uiStrings }) {
           {t.error} {error}
         </div>
       )}
-      {result && (
+      {trailingResult && (
+        <div className="trailing-result" style={{ marginTop: 12 }}>
+          <div className="trailing-result-meta">
+            <strong>Data source:</strong> {trailingResult.dataSourceLabel}
+            <span>Granularity: {trailingResult.granularityLabel}</span>
+          </div>
+          {trailingResult.warning && (
+            <div className="trailing-warning">
+              {trailingResult.warning}
+            </div>
+          )}
+
+          <div className="trailing-copy-grid">
+            <div className="trailing-copy-section">
+              <div className="trailing-copy-header">
+                <label className="label">For the Customer</label>
+                <button className="btn secondary trailing-copy-btn" onClick={() => copyText(trailingResult.customer)}>
+                  Copy Customer Message
+                </button>
+              </div>
+              <textarea className="textarea trailing-textarea" value={trailingResult.customer} readOnly />
+            </div>
+
+            <div className="trailing-copy-section">
+              <div className="trailing-copy-header">
+                <label className="label">For the Agent</label>
+                <button className="btn secondary trailing-copy-btn" onClick={() => copyText(trailingResult.agent)}>
+                  Copy Agent Notes
+                </button>
+              </div>
+              <textarea className="textarea trailing-textarea" value={trailingResult.agent} readOnly />
+            </div>
+          </div>
+        </div>
+      )}
+      {!trailingResult && result && (
         <div style={{ marginTop: 12 }}>
           <label className="label">{t.resultLabel}</label>
           <textarea className="textarea" value={result} readOnly />

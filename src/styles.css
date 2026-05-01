@@ -183,6 +183,76 @@ body {
   margin-top: 6px;
 }
 
+.trailing-result {
+  display: grid;
+  gap: 12px;
+}
+
+.trailing-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 229, 168, .25);
+  border-radius: 8px;
+  background: rgba(0, 229, 168, .08);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.trailing-warning {
+  padding: 10px 12px;
+  border: 1px solid rgba(234, 179, 8, .3);
+  border-left: 3px solid #eab308;
+  border-radius: 8px;
+  background: rgba(234, 179, 8, .1);
+  color: #fde68a;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.trailing-copy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.trailing-copy-section {
+  min-width: 0;
+}
+
+.trailing-copy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.trailing-copy-header .label {
+  margin-bottom: 0;
+}
+
+.trailing-copy-btn {
+  width: auto;
+  padding: 8px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.trailing-textarea {
+  min-height: 300px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .trailing-copy-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .hr {
   height: 1px;
   margin: 18px 0;

@@ -99,6 +99,7 @@ async function fetchAllKlines(kind, symbol, startMs, endMs, market = "futures", 
 
   // Interval duration in ms
   let stepMs = 60_000;
+  if (interval === "1s") stepMs = 1_000;
   if (interval === "1h") stepMs = 3600_000;
   if (interval === "1d") stepMs = 86400_000;
 
@@ -713,144 +714,269 @@ export async function analyzeMarkVsLastGap(symbol, fromStr, toStr, targetPrice =
 
 /**
  * 🎯 Trailing Stop Simulation (Binance Futures Logic)
- * 1. Wait for Activation Price (if provided)
- * 2. Track Peak (Sell/Short) or Trough (Buy/Long)
- * 3. Trigger when price deviates by callbackRate from Peak/Trough
+ *
+ *   Step 0: Pick the data source the order actually used.
+ *           - "last" → 1s klines from /fapi/v1/klines (best precision Binance
+ *             exposes publicly for Last Price). Fallback to 1m only if 1s
+ *             returns nothing (very old data / unsupported symbol).
+ *           - "mark" → 1m markPriceKlines. Mark Price has NO sub-minute
+ *             interval on Binance, so the result is inherently approximate
+ *             and must be flagged as such to the agent.
+ *   Step 1: Walk the candles in chronological order. Find the first sub-point
+ *           where the activation price condition is met.
+ *   Step 2: After activation, track the running TROUGH (BUY trailing) or
+ *           PEAK (SELL trailing). The reference point only moves in the
+ *           favourable direction — never back.
+ *   Step 3: At every sub-point, compute rebound/pullback vs the reference.
+ *           First sub-point where the deviation reaches callback rate = trigger.
+ *   Step 4 (Last Price only): drill into aggTrades for the trigger second
+ *           to refine timestamps to millisecond precision.
+ *
+ * Within a single candle the true tick order is unknown. We use a
+ * CONSERVATIVE sub-point ordering that expands the reference first and
+ * THEN checks the trigger:
+ *   - SELL (track peak):  [open, high, low, close] — peak update first.
+ *   - BUY  (track trough): [open, low, high, close] — trough update first.
+ * For 1s candles this barely matters (very few ticks per second), but for
+ * 1m fallback / Mark Price it gives the answer that best matches what an
+ * agent reading the chart would see. The previous implementation used the
+ * OPPOSITE ordering (aggressive) which both fired triggers in the wrong
+ * candle AND silently produced wrong trough/peak prices.
  */
-export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice, callbackRate, direction, market = "futures", priceType = "last") {
-  // Normalize range to minute boundaries to ensure we get at least one 1m candle from Binance
+async function checkTrailingStopLegacy(symbol, fromStr, toStr, activationPrice, callbackRate, direction, market = "futures", priceType = "last") {
   let startMs = Date.parse(fromStr + "Z");
   let endMs = Date.parse(toStr + "Z");
   if (isNaN(startMs) || isNaN(endMs)) throw new Error("Invalid date format.");
 
   if (endMs <= startMs) {
     // If range is virtually instant or backward, extend to at least 1 minute
-    endMs = startMs + 60000;
+    endMs = startMs + 60_000;
   }
 
-  // Align to minute start for the fetch to avoid empty responses from Binance
-  const fetchStart = Math.floor(startMs / 60000) * 60000;
-  const fetchEnd = Math.ceil(endMs / 60000) * 60000;
-
+  // -------------------------------------------------------------------
+  // Step 0: Pick data source + granularity
+  // -------------------------------------------------------------------
   const fetchKind = priceType === "mark" ? "mark" : "last";
-  // Fetch 1m candles for the whole range
-  const candles = await fetchAllKlines(fetchKind, symbol, fetchStart, fetchEnd, market, "1m");
+  const wantSecondPrecision = priceType === "last"; // Mark has no 1s on Binance
 
-  if (!candles.length) return { status: "not_found" };
+  let interval = wantSecondPrecision ? "1s" : "1m";
+  let granularity = interval;
+  let candles = [];
+  let fellBackTo1m = false;
 
-  let isActivated = !activationPrice; // If no activation price, it's active immediately
+  if (interval === "1s") {
+    // Align to second boundaries
+    const fetchStart = Math.floor(startMs / 1000) * 1000;
+    const fetchEnd = Math.ceil(endMs / 1000) * 1000;
+    try {
+      candles = await fetchAllKlines(fetchKind, symbol, fetchStart, fetchEnd, market, "1s");
+    } catch (_e) {
+      candles = [];
+    }
+    // Spot does not support 1s on /api/v3/klines for all symbols. If the
+    // response is empty, transparently fall back to 1m so the tool still
+    // produces an answer (flagged as approximate).
+    if (!candles.length) {
+      const ms = Math.floor(startMs / 60_000) * 60_000;
+      const me = Math.ceil(endMs / 60_000) * 60_000;
+      candles = await fetchAllKlines(fetchKind, symbol, ms, me, market, "1m");
+      interval = "1m";
+      granularity = "1m";
+      fellBackTo1m = true;
+    }
+  } else {
+    // Mark Price: only 1m exists.
+    const ms = Math.floor(startMs / 60_000) * 60_000;
+    const me = Math.ceil(endMs / 60_000) * 60_000;
+    candles = await fetchAllKlines(fetchKind, symbol, ms, me, market, "1m");
+  }
+
+  // The result is approximate when we don't have sub-minute information.
+  const isApproximate = priceType === "mark" || fellBackTo1m;
+
+  if (!candles.length) {
+    return {
+      status: "not_found",
+      dataSource: priceType,
+      granularity,
+      isApproximate,
+      fellBackTo1m,
+      symbol,
+      period: `${fromStr} -> ${toStr}`,
+    };
+  }
+
+  // -------------------------------------------------------------------
+  // Steps 1–3: Sequential simulation
+  // -------------------------------------------------------------------
+  let isActivated = !activationPrice;
   let activationTime = null;
-  let peakPrice = direction === "short" ? -Infinity : Infinity; // Highest High for Sell, Lowest Low for Buy
+  let activationTs = null;
+  let peakPrice = direction === "short" ? -Infinity : Infinity; // Peak for SELL, Trough for BUY
   let peakTime = null;
+  let peakTs = null;
   let triggerTime = null;
+  let triggerTs = null;
   let triggerPrice = null;
-  let maxObservedCallback = 0; // The closest the price got to triggering in %
+  let maxObservedCallback = 0;
 
-  // Used only for logging or internal logic if needed, but not actively used in loop
-  // const cbMultiplier = callbackRate / 100; 
-
-  for (const c of candles) {
+  outer: for (const c of candles) {
     const t = Number(c[0]);
     const o = parseFloat(c[1]);
     const h = parseFloat(c[2]);
     const l = parseFloat(c[3]);
     const cl = parseFloat(c[4]);
 
-    // To be conservative and avoid "look-ahead" bias in 1m OHLC:
-    // Short (Sell): Assume price hits Low BEFORE High (delays trigger)
-    // Long (Buy): Assume price hits High BEFORE Low (delays trigger)
-    const subPoints = direction === "short" ? [o, l, h, cl] : [o, h, l, cl];
+    // CONSERVATIVE ordering: expand reference first, then check trigger.
+    //   SELL (peak): [o, h, l, cl] — high pushes peak up, then low tests pullback.
+    //   BUY (trough): [o, l, h, cl] — low pushes trough down, then high tests rebound.
+    const subPoints = direction === "short" ? [o, h, l, cl] : [o, l, h, cl];
 
     for (const p of subPoints) {
       // Phase 1: Activation
       if (!isActivated) {
-        if (direction === "short" ? p >= activationPrice : p <= activationPrice) {
+        const activated = direction === "short" ? p >= activationPrice : p <= activationPrice;
+        if (activated) {
           isActivated = true;
           activationTime = fmtUTC(t);
-          peakPrice = p; // Start tracking from activation point
+          activationTs = t;
+          peakPrice = p;
           peakTime = fmtUTC(t);
+          peakTs = t;
+        } else {
+          continue;
         }
-        if (!isActivated) continue;
       }
 
-      // Phase 2 & 3: Tracking Peak and checking Trigger
-      // Update Peak/Trough
+      // Phase 2: Update peak/trough
       if (direction === "short") {
         if (p > peakPrice) {
           peakPrice = p;
           peakTime = fmtUTC(t);
+          peakTs = t;
         }
       } else {
         if (p < peakPrice) {
           peakPrice = p;
           peakTime = fmtUTC(t);
+          peakTs = t;
         }
       }
 
-      // Check Trigger Condition
+      // Phase 3: Trigger check
       const currentDev = direction === "short"
         ? ((peakPrice - p) / peakPrice) * 100
         : ((p - peakPrice) / peakPrice) * 100;
 
-      if (currentDev > maxObservedCallback) {
-        maxObservedCallback = currentDev;
-      }
+      if (currentDev > maxObservedCallback) maxObservedCallback = currentDev;
 
       if (currentDev >= callbackRate) {
         triggerTime = fmtUTC(t);
+        triggerTs = t;
         triggerPrice = direction === "short"
           ? peakPrice * (1 - callbackRate / 100)
           : peakPrice * (1 + callbackRate / 100);
-
-        // --- ENHANCEMENT: Second Precision ---
-        if (priceType === "last" && market === "futures") {
-          try {
-            const bases = F_BASES;
-            const trades = await fetchWithFallback(bases, `/fapi/v1/aggTrades?symbol=${symbol}&startTime=${t}&endTime=${t + 59999}`, "AggTrades");
-            if (trades && trades.length) {
-              let localPeak = peakPrice;
-              let searchIsActivated = isActivated && activationTime !== fmtUTC(t);
-
-              for (const tr of trades) {
-                const tp = parseFloat(tr.p);
-                const ts = Number(tr.T);
-
-                if (!searchIsActivated) {
-                  if (direction === "short" ? tp >= activationPrice : tp <= activationPrice) {
-                    searchIsActivated = true;
-                    activationTime = fmtUTC(ts);
-                    localPeak = tp;
-                  }
-                }
-
-                if (searchIsActivated) {
-                  if (direction === "short") {
-                    if (tp > localPeak) localPeak = tp;
-                    if (tp <= localPeak * (1 - callbackRate / 100)) {
-                      triggerTime = fmtUTC(ts);
-                      triggerPrice = localPeak * (1 - callbackRate / 100);
-                      break;
-                    }
-                  } else {
-                    if (tp < localPeak) localPeak = tp;
-                    if (tp >= localPeak * (1 + callbackRate / 100)) {
-                      triggerTime = fmtUTC(ts);
-                      triggerPrice = localPeak * (1 + callbackRate / 100);
-                      break;
-                    }
-                  }
-                }
-              }
-              peakPrice = localPeak;
-            }
-          } catch (e) {
-            console.warn("Precision fetch failed:", e);
-          }
-        }
-        break;
+        break outer;
       }
     }
-    if (triggerTime) break;
+  }
+
+  // -------------------------------------------------------------------
+  // Step 4: Last Price aggTrades refinement (millisecond precision)
+  //
+  // For Last Price + Futures, drill into aggTrades for the trigger
+  // candle's time window. This pinpoints the actual tick that crossed
+  // the trigger threshold and can also push the trough/peak to a more
+  // exact moment within the 1s window. We ignore failures silently —
+  // 1s precision is already correct, this is a best-effort upgrade.
+  // -------------------------------------------------------------------
+  if (priceType === "last" && market === "futures" && triggerTs && !fellBackTo1m) {
+    try {
+      // The trigger 1s candle covers [triggerTs, triggerTs+999]. To capture
+      // the full sequence (trough that may be in the same second), pull a
+      // narrow window starting from peakTs (or activationTs) up to a few
+      // seconds past the trigger candle so we don't miss the boundary tick.
+      const fromTs = Math.min(activationTs ?? triggerTs, peakTs ?? triggerTs, triggerTs);
+      const toTs = triggerTs + 1999;
+      const path = `/fapi/v1/aggTrades?symbol=${encodeURIComponent(symbol)}&startTime=${fromTs}&endTime=${toTs}&limit=1000`;
+      const trades = await fetchWithFallback(F_BASES, path, "AggTrades");
+
+      if (Array.isArray(trades) && trades.length) {
+        // Re-run the simulation across these ticks to get exact ms timestamps.
+        // We seed the simulation state from the kline-level result so we don't
+        // re-derive activation if it occurred far earlier.
+        let tickActivationTs = activationTs;
+        let tickActivationTime = activationTime;
+        let tickPeak = peakPrice;
+        let tickPeakTs = peakTs;
+        let tickPeakTime = peakTime;
+        let tickTriggerTs = triggerTs;
+        let tickTriggerTime = triggerTime;
+        let tickTriggerPrice = triggerPrice;
+        let foundTickTrigger = false;
+
+        for (const tr of trades) {
+          const tp = parseFloat(tr.p);
+          const ts = Number(tr.T);
+
+          // Refine activation timestamp if this tick is the first to satisfy
+          // the activation condition AND we don't yet have a sub-second one.
+          if (activationTs && ts <= activationTs + 999) {
+            const meets = direction === "short" ? tp >= activationPrice : tp <= activationPrice;
+            if (meets && (tickActivationTs === activationTs || ts < tickActivationTs)) {
+              tickActivationTs = ts;
+              tickActivationTime = fmtUTC(ts);
+            }
+          }
+
+          // Update peak/trough at tick level. We only adjust within the
+          // window we already scanned — the kline pass already handled
+          // anything earlier.
+          if (direction === "short") {
+            if (tp > tickPeak) {
+              tickPeak = tp;
+              tickPeakTs = ts;
+              tickPeakTime = fmtUTC(ts);
+            }
+          } else {
+            if (tp < tickPeak) {
+              tickPeak = tp;
+              tickPeakTs = ts;
+              tickPeakTime = fmtUTC(ts);
+            }
+          }
+
+          // Trigger check at tick precision
+          const dev = direction === "short"
+            ? ((tickPeak - tp) / tickPeak) * 100
+            : ((tp - tickPeak) / tickPeak) * 100;
+
+          if (dev >= callbackRate) {
+            tickTriggerTs = ts;
+            tickTriggerTime = fmtUTC(ts);
+            tickTriggerPrice = direction === "short"
+              ? tickPeak * (1 - callbackRate / 100)
+              : tickPeak * (1 + callbackRate / 100);
+            foundTickTrigger = true;
+            break;
+          }
+        }
+
+        if (foundTickTrigger) {
+          activationTs = tickActivationTs;
+          activationTime = tickActivationTime;
+          peakPrice = tickPeak;
+          peakTs = tickPeakTs;
+          peakTime = tickPeakTime;
+          triggerTs = tickTriggerTs;
+          triggerTime = tickTriggerTime;
+          triggerPrice = tickTriggerPrice;
+        }
+      }
+    } catch (e) {
+      // Refinement is best-effort. 1s candle level data is already correct.
+      console.warn("Trailing stop tick refinement failed:", e);
+    }
   }
 
   return {
@@ -862,8 +988,485 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
     triggerTime,
     triggerPrice,
     maxObservedCallback,
-    isEstimated: priceType === "mark" && isActivated && triggerTime && (activationTime === triggerTime || peakTime === triggerTime),
+    dataSource: priceType,        // "last" | "mark"
+    granularity,                  // "1s" | "1m"
+    isApproximate,                // true when sub-minute information is unavailable
+    fellBackTo1m,                 // Last Price had to fall back to 1m
+    isEstimated: isApproximate,   // legacy alias used by older UI code
     symbol,
-    period: `${fromStr} -> ${toStr}`
+    period: `${fromStr} -> ${toStr}`,
   };
+}
+
+const MARK_PRICE_TRAILING_WARNING =
+  "Mark Price analysis uses 1-minute candles (Binance does not provide Mark Price data below 1m). Timestamps are approximate to the minute, but trough/peak/trigger prices are calculated correctly from candle extremes.";
+
+function trailingSecondInclusiveEnd(endMs) {
+  return Math.floor(endMs / 1000) * 1000 + 999;
+}
+
+function trailingCandleInfo(c) {
+  return {
+    openTime: Number(c[0]),
+    open: parseFloat(c[1]),
+    high: parseFloat(c[2]),
+    low: parseFloat(c[3]),
+    close: parseFloat(c[4]),
+  };
+}
+
+function trailingSourceLabel(priceType, granularity) {
+  if (priceType === "mark") return "Mark Price (1m markPriceKlines)";
+  if (granularity === "aggTrades") return "Last Price (aggTrades fallback)";
+  return "Last Price (1s klines)";
+}
+
+function buildTrailingStopResult({
+  symbol,
+  fromStr,
+  toStr,
+  direction,
+  priceType,
+  granularity,
+  activationPrice,
+  callbackRate,
+  startMs,
+  endMs,
+  isActivated,
+  activationTs,
+  activationPriceObserved,
+  referencePrice,
+  referenceTs,
+  triggerTs,
+  triggerPrice,
+  triggerObservedPrice,
+  maxObservedCallback,
+  markDetails = null,
+}) {
+  const isApproximate = priceType === "mark";
+  const isSellTrailing = direction === "short";
+  const callbackDecimal = callbackRate / 100;
+  const requiredMovePrice = referencePrice == null
+    ? null
+    : isSellTrailing
+      ? referencePrice * (1 - callbackDecimal)
+      : referencePrice * (1 + callbackDecimal);
+
+  return {
+    status: triggerTs ? "triggered" : (isActivated ? "activated_no_trigger" : "not_activated"),
+    isActivated,
+    activationTime: activationTs == null ? null : fmtUTC(activationTs),
+    activationTs,
+    activationPrice,
+    activationPriceObserved,
+    peakPrice: referencePrice,
+    peakTime: referenceTs == null ? null : fmtUTC(referenceTs),
+    peakTs: referenceTs,
+    referencePrice,
+    referenceTime: referenceTs == null ? null : fmtUTC(referenceTs),
+    referenceTs,
+    referenceLabel: isSellTrailing ? "Peak (highest)" : "Trough (lowest)",
+    triggerTime: triggerTs == null ? null : fmtUTC(triggerTs),
+    triggerTs,
+    triggerPrice: triggerPrice ?? requiredMovePrice,
+    triggerObservedPrice,
+    maxObservedCallback,
+    reboundPct: triggerTs ? maxObservedCallback : null,
+    dataSource: priceType,
+    dataSourceLabel: trailingSourceLabel(priceType, granularity),
+    granularity,
+    isApproximate,
+    fellBackTo1m: false,
+    isEstimated: isApproximate,
+    markWarning: priceType === "mark" ? MARK_PRICE_TRAILING_WARNING : null,
+    markDetails,
+    direction,
+    trailingSide: isSellTrailing ? "SELL" : "BUY",
+    requestStartTs: startMs,
+    requestEndTs: endMs,
+    symbol,
+    period: `${fromStr} -> ${toStr}`,
+  };
+}
+
+function analyzeTrailingStopPoints(points, opts) {
+  const {
+    symbol,
+    fromStr,
+    toStr,
+    direction,
+    priceType,
+    granularity,
+    activationPrice,
+    callbackRate,
+    startMs,
+    endMs,
+  } = opts;
+
+  const callbackDecimal = callbackRate / 100;
+  const isSellTrailing = direction === "short";
+  const endInclusiveMs = trailingSecondInclusiveEnd(endMs);
+  let isActivated = !Number.isFinite(activationPrice);
+  let activationTs = isActivated && points.length ? points[0].ts : null;
+  let activationPriceObserved = isActivated && points.length ? points[0].price : null;
+  let referencePrice = isSellTrailing ? -Infinity : Infinity;
+  let referenceTs = null;
+  let triggerTs = null;
+  let triggerPrice = null;
+  let triggerObservedPrice = null;
+  let maxObservedCallback = 0;
+
+  for (const point of points) {
+    if (point.ts < startMs || point.ts > endInclusiveMs) continue;
+    const p = point.price;
+    if (!Number.isFinite(p)) continue;
+
+    if (!isActivated) {
+      const activated = isSellTrailing ? p >= activationPrice : p <= activationPrice;
+      if (!activated) continue;
+
+      isActivated = true;
+      activationTs = point.ts;
+      activationPriceObserved = p;
+      referencePrice = p;
+      referenceTs = point.ts;
+    }
+
+    if (isSellTrailing) {
+      if (p > referencePrice) {
+        referencePrice = p;
+        referenceTs = point.ts;
+      }
+    } else if (p < referencePrice) {
+      referencePrice = p;
+      referenceTs = point.ts;
+    }
+
+    const currentDev = isSellTrailing
+      ? ((referencePrice - p) / referencePrice) * 100
+      : ((p - referencePrice) / referencePrice) * 100;
+
+    if (currentDev > maxObservedCallback) maxObservedCallback = currentDev;
+
+    if (currentDev >= callbackRate) {
+      triggerTs = point.ts;
+      triggerObservedPrice = p;
+      triggerPrice = isSellTrailing
+        ? referencePrice * (1 - callbackDecimal)
+        : referencePrice * (1 + callbackDecimal);
+      break;
+    }
+  }
+
+  return buildTrailingStopResult({
+    symbol,
+    fromStr,
+    toStr,
+    direction,
+    priceType,
+    granularity,
+    activationPrice,
+    callbackRate,
+    startMs,
+    endMs,
+    isActivated,
+    activationTs,
+    activationPriceObserved,
+    referencePrice: referencePrice === -Infinity || referencePrice === Infinity ? null : referencePrice,
+    referenceTs,
+    triggerTs,
+    triggerPrice,
+    triggerObservedPrice,
+    maxObservedCallback,
+  });
+}
+
+function buildLastKlineTrailingPoints(candles, direction, startMs, endMs) {
+  const startSecond = Math.floor(startMs / 1000) * 1000;
+  const endSecond = Math.floor(endMs / 1000) * 1000;
+  const isSellTrailing = direction === "short";
+  const points = [];
+
+  for (const raw of candles) {
+    const c = trailingCandleInfo(raw);
+    if (c.openTime < startSecond || c.openTime > endSecond) continue;
+    const seq = isSellTrailing
+      ? [
+        { price: c.open, kind: "open" },
+        { price: c.high, kind: "high" },
+        { price: c.low, kind: "low" },
+        { price: c.close, kind: "close" },
+      ]
+      : [
+        { price: c.open, kind: "open" },
+        { price: c.low, kind: "low" },
+        { price: c.high, kind: "high" },
+        { price: c.close, kind: "close" },
+      ];
+
+    for (const item of seq) {
+      points.push({
+        ts: c.openTime,
+        price: item.price,
+        kind: item.kind,
+        candle: c,
+      });
+    }
+  }
+
+  return points.sort((a, b) => a.ts - b.ts);
+}
+
+async function fetchTrailingAggTradePoints(symbol, startMs, endMs, market = "futures") {
+  const bases = market === "futures" ? F_BASES : S_BASES;
+  const pathBase = market === "futures" ? "/fapi/v1/aggTrades" : "/api/v3/aggTrades";
+  const endInclusiveMs = trailingSecondInclusiveEnd(endMs);
+  let cur = startMs;
+  let guard = 0;
+  const out = [];
+
+  while (cur <= endInclusiveMs && guard++ < 1000) {
+    const path = `${pathBase}?symbol=${encodeURIComponent(symbol)}&startTime=${cur}&endTime=${endInclusiveMs}&limit=1000`;
+    const chunk = await fetchWithFallback(bases, path, "aggTrades");
+    if (!Array.isArray(chunk) || !chunk.length) break;
+
+    for (const tr of chunk) {
+      const ts = Number(tr.T);
+      const price = parseFloat(tr.p);
+      if (ts >= startMs && ts <= endInclusiveMs && Number.isFinite(price)) {
+        out.push({ ts, price, kind: "trade", trade: tr });
+      }
+    }
+
+    const lastTs = Number(chunk[chunk.length - 1].T);
+    if (!Number.isFinite(lastTs) || lastTs < cur || lastTs >= endInclusiveMs) break;
+    cur = lastTs + 1;
+  }
+
+  return out.sort((a, b) => a.ts - b.ts);
+}
+
+function analyzeMarkTrailingStopCandles(candles, opts) {
+  const {
+    symbol,
+    fromStr,
+    toStr,
+    direction,
+    activationPrice,
+    callbackRate,
+    startMs,
+    endMs,
+  } = opts;
+
+  const callbackDecimal = callbackRate / 100;
+  const isSellTrailing = direction === "short";
+  const endInclusiveMs = trailingSecondInclusiveEnd(endMs);
+  let isActivated = !Number.isFinite(activationPrice);
+  let activationTs = null;
+  let activationPriceObserved = null;
+  let referencePrice = isSellTrailing ? -Infinity : Infinity;
+  let referenceTs = null;
+  let triggerTs = null;
+  let triggerPrice = null;
+  let triggerObservedPrice = null;
+  let maxObservedCallback = 0;
+  const markDetails = {
+    activationCandle: null,
+    referenceCandle: null,
+    triggerCandle: null,
+    referenceExtreme: isSellTrailing ? "high" : "low",
+    triggerExtreme: isSellTrailing ? "low" : "high",
+  };
+
+  for (const raw of candles) {
+    const c = trailingCandleInfo(raw);
+    const candleEnd = c.openTime + 59_999;
+    if (candleEnd < startMs || c.openTime > endInclusiveMs) continue;
+
+    const eventTs = Math.min(Math.max(c.openTime, startMs), endInclusiveMs);
+    const activationProbe = isSellTrailing ? c.high : c.low;
+    const referenceCandidate = isSellTrailing ? c.high : c.low;
+    const triggerProbe = isSellTrailing ? c.low : c.high;
+
+    if (!isActivated) {
+      const activated = isSellTrailing
+        ? activationProbe >= activationPrice
+        : activationProbe <= activationPrice;
+      if (!activated) continue;
+
+      isActivated = true;
+      activationTs = eventTs;
+      activationPriceObserved = activationProbe;
+      referencePrice = referenceCandidate;
+      referenceTs = eventTs;
+      markDetails.activationCandle = c;
+      markDetails.referenceCandle = c;
+    }
+
+    if (isSellTrailing) {
+      if (referenceCandidate > referencePrice) {
+        referencePrice = referenceCandidate;
+        referenceTs = eventTs;
+        markDetails.referenceCandle = c;
+      }
+    } else if (referenceCandidate < referencePrice) {
+      referencePrice = referenceCandidate;
+      referenceTs = eventTs;
+      markDetails.referenceCandle = c;
+    }
+
+    const currentDev = isSellTrailing
+      ? ((referencePrice - triggerProbe) / referencePrice) * 100
+      : ((triggerProbe - referencePrice) / referencePrice) * 100;
+
+    if (currentDev > maxObservedCallback) maxObservedCallback = currentDev;
+
+    if (currentDev >= callbackRate) {
+      triggerTs = eventTs;
+      triggerObservedPrice = triggerProbe;
+      triggerPrice = isSellTrailing
+        ? referencePrice * (1 - callbackDecimal)
+        : referencePrice * (1 + callbackDecimal);
+      markDetails.triggerCandle = c;
+      break;
+    }
+  }
+
+  return buildTrailingStopResult({
+    symbol,
+    fromStr,
+    toStr,
+    direction,
+    priceType: "mark",
+    granularity: "1m",
+    activationPrice,
+    callbackRate,
+    startMs,
+    endMs,
+    isActivated,
+    activationTs,
+    activationPriceObserved,
+    referencePrice: referencePrice === -Infinity || referencePrice === Infinity ? null : referencePrice,
+    referenceTs,
+    triggerTs,
+    triggerPrice,
+    triggerObservedPrice,
+    maxObservedCallback,
+    markDetails,
+  });
+}
+
+/**
+ * Trailing Stop Simulation (Binance Futures logic)
+ *
+ * Last Price orders are analyzed from /fapi/v1/klines interval=1s. If 1s
+ * klines are unavailable, the only fallback is aggTrades. Last Price never
+ * falls back to 1m candles.
+ *
+ * Mark Price orders use /fapi/v1/markPriceKlines interval=1m because Binance
+ * does not expose sub-minute historical Mark Price data. For BUY trailing,
+ * each candle low updates the trough and its high probes the rebound. For
+ * SELL trailing, each candle high updates the peak and its low probes the
+ * pullback.
+ */
+export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice, callbackRate, direction, market = "futures", priceType = "last") {
+  const startMs = Date.parse(fromStr + "Z");
+  const endMs = Date.parse(toStr + "Z");
+  if (isNaN(startMs) || isNaN(endMs)) throw new Error("Invalid date format.");
+  if (endMs < startMs) throw new Error("End time must be after start time.");
+
+  const normalizedSymbol = symbol.toUpperCase();
+  const finalType = market === "futures" && priceType === "mark" ? "mark" : "last";
+
+  if (finalType === "mark") {
+    const fetchStart = Math.floor(startMs / 60_000) * 60_000;
+    const fetchEnd = Math.floor(endMs / 60_000) * 60_000 + 60_000;
+    const candles = await fetchAllKlines("mark", normalizedSymbol, fetchStart, fetchEnd, "futures", "1m");
+
+    if (!candles.length) {
+      return {
+        status: "not_found",
+        dataSource: "mark",
+        dataSourceLabel: trailingSourceLabel("mark", "1m"),
+        granularity: "1m",
+        isApproximate: true,
+        fellBackTo1m: false,
+        isEstimated: true,
+        markWarning: MARK_PRICE_TRAILING_WARNING,
+        symbol: normalizedSymbol,
+        period: `${fromStr} -> ${toStr}`,
+        requestStartTs: startMs,
+        requestEndTs: endMs,
+      };
+    }
+
+    return analyzeMarkTrailingStopCandles(candles, {
+      symbol: normalizedSymbol,
+      fromStr,
+      toStr,
+      direction,
+      activationPrice,
+      callbackRate,
+      startMs,
+      endMs,
+    });
+  }
+
+  const fetchStart = Math.floor(startMs / 1000) * 1000;
+  const fetchEnd = Math.floor(endMs / 1000) * 1000 + 1000;
+  let candles = [];
+
+  try {
+    candles = await fetchAllKlines("last", normalizedSymbol, fetchStart, fetchEnd, market, "1s");
+  } catch (_e) {
+    candles = [];
+  }
+
+  if (candles.length) {
+    const points = buildLastKlineTrailingPoints(candles, direction, startMs, endMs);
+    if (points.length) {
+      return analyzeTrailingStopPoints(points, {
+        symbol: normalizedSymbol,
+        fromStr,
+        toStr,
+        direction,
+        priceType: "last",
+        granularity: "1s",
+        activationPrice,
+        callbackRate,
+        startMs,
+        endMs,
+      });
+    }
+  }
+
+  const tradePoints = await fetchTrailingAggTradePoints(normalizedSymbol, startMs, endMs, market);
+  if (!tradePoints.length) {
+    return {
+      status: "not_found",
+      dataSource: "last",
+      dataSourceLabel: trailingSourceLabel("last", "aggTrades"),
+      granularity: "aggTrades",
+      isApproximate: false,
+      fellBackTo1m: false,
+      isEstimated: false,
+      symbol: normalizedSymbol,
+      period: `${fromStr} -> ${toStr}`,
+      requestStartTs: startMs,
+      requestEndTs: endMs,
+    };
+  }
+
+  return analyzeTrailingStopPoints(tradePoints, {
+    symbol: normalizedSymbol,
+    fromStr,
+    toStr,
+    direction,
+    priceType: "last",
+    granularity: "aggTrades",
+    activationPrice,
+    callbackRate,
+    startMs,
+    endMs,
+  });
 }
