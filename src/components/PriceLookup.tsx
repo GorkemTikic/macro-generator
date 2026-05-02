@@ -70,15 +70,22 @@ export default function PriceLookup({ lang, uiStrings }) {
     const triggerMove = isBuy ? "upward" : "downward";
     const triggerVerb = isBuy ? "rebound upward" : "move downward";
     const triggerFormula = isBuy ? "1 +" : "1 -";
-    const conditionOperator = isBuy ? ">=" : "<=";
     const referencePrice = Number(data.referencePrice ?? data.peakPrice);
     const requiredPrice = Number(data.triggerPrice);
     const observedTrigger = Number(data.triggerObservedPrice ?? data.triggerPrice);
     const activationTime = fmtResultTime(data.activationTime, isMark);
     const referenceTime = fmtResultTime(data.referenceTime || data.peakTime, isMark);
     const triggerTime = fmtResultTime(data.triggerTime, isMark);
-    const sourceLabel = data.dataSourceLabel || (isMark ? "Mark Price (1m markPriceKlines)" : "Last Price (1s klines)");
-    const granularityLabel = isMark ? "1m (Mark Price limit)" : data.granularity;
+    const granularityRaw = data.granularity || (isMark ? "1m" : "aggTrades");
+    const sourceLabel = data.dataSourceLabel || (
+      isMark
+        ? "Mark Price (1m markPriceKlines)"
+        : (granularityRaw === "1s" ? "Last Price (1s klines)" : "Last Price (aggTrades, tick precision)")
+    );
+    const granularityLabel = isMark
+      ? "1m (Mark Price limit)"
+      : (granularityRaw === "1s" ? "1s (Spot klines)" : "Tick (aggTrades)");
+    const referenceSourceTag = isMark ? "Mark Price candle" : "Last Price tick";
     const markNote = isMark
       ? "\n\nPlease note that Mark Price is checked using 1-minute intervals, so the times are shown by minute."
       : "";
@@ -130,19 +137,24 @@ export default function PriceLookup({ lang, uiStrings }) {
         `  - Rebound Rate >= Callback Rate (${fmtInputPrice(params.callbackRate)}%)  ❌\n\n` +
         `Result: Not triggered. Activation condition was not met.`;
     } else {
+      const referenceLabel = isBuy ? "True Trough" : "True Peak";
+      const crossLabel = isBuy
+        ? "First trade crossing threshold"
+        : "First trade crossing threshold (downward)";
+
       agent +=
-        `Activation:        ${fmtInputPrice(params.activationPrice)} hit at ${activationTime}\n` +
-        `${referenceTech}:   ${fmtPrice(referencePrice)} at ${referenceTime}\n` +
-        `Required move:     ${fmtPrice(referencePrice)} x (${triggerFormula} ${fmtCallbackDecimal(params.callbackRate)}) = ${fmtPrice(requiredPrice)}\n`;
+        `Activation reached:           ${fmtInputPrice(params.activationPrice)} hit at ${activationTime}\n` +
+        `${referenceLabel} (${referenceSourceTag}):  ${fmtPrice(referencePrice)} at ${referenceTime}\n` +
+        `Required trigger threshold:   ${fmtPrice(referencePrice)} x (${triggerFormula} ${fmtCallbackDecimal(params.callbackRate)}) = ${fmtPrice(requiredPrice)}\n`;
 
       if (data.status === "triggered") {
-        agent += `Actual move:       ${fmtPrice(observedTrigger)} hit at ${triggerTime}\n`;
+        agent += `${crossLabel}: ${fmtPrice(observedTrigger)} at ${triggerTime}\n`;
       } else {
-        agent += `Actual move:       Max observed = ${fmtPct(data.maxObservedCallback)}\n`;
+        agent += `${crossLabel}: none — max observed callback = ${fmtPct(data.maxObservedCallback)}\n`;
       }
 
       agent +=
-        `Rebound %:         ${reboundLine}\n\n` +
+        `Rebound %:                    ${reboundLine}\n\n` +
         `Conditions met:\n` +
         `  - ${conditionLine}  ✅\n` +
         `  - Rebound Rate (${fmtPct(data.maxObservedCallback)}) >= Callback Rate (${fmtInputPrice(params.callbackRate)}%)  ${data.status === "triggered" ? "✅" : "❌"}\n\n`;
@@ -156,8 +168,12 @@ export default function PriceLookup({ lang, uiStrings }) {
           `  - Trigger probe candle: ${candleMinute(md.triggerCandle)} ${md.triggerExtreme}=${fmtPrice(isBuy ? md.triggerCandle?.high : md.triggerCandle?.low)}\n\n`;
       }
 
+      agent +=
+        `Fill price: not available from this analysis. The trailing stop fires a market order whose actual fill is determined by the orderbook at trigger time. ` +
+        `To get the real fill price, check the order's Trade History in Binance — this tool only computes the moment the threshold was crossed.\n\n`;
+
       agent += data.status === "triggered"
-        ? `Result: Trigger valid. Order executed correctly.`
+        ? `Result: Trigger valid. Threshold-crossing trade observed inside the requested window.`
         : `Result: Not triggered within the selected window.`;
     }
 

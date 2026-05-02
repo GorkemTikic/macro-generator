@@ -4,19 +4,22 @@
 //
 // Self-contained verification for src/pricing.ts → checkTrailingStop.
 // We monkey-patch globalThis.fetch so the test never touches the real
-// Binance API, then assert that the algorithm returns the expected
-// trough/peak/trigger for both LAST and MARK price flows.
-//
-// Reference case (CLUSDT, 2026-05-01): activation 103.86, callback 0.25%,
-// direction LONG (buy trailing → closes a SHORT). Real chart truth verified
-// on TradingView 1s:
-//   - Activation reached at 12:12:26 (price drops to 103.86)
-//   - Trough 103.58560 around 12:13:03–12:13:05
-//   - Trigger at 12:13:07 with price ~103.83966 (= 103.58560 × 1.0025)
+// Binance API. The Last Price BUY test (Test 1) is fed REAL Binance Futures
+// aggTrades captured into test-fixtures/aggtrades_clusdt.json — no synthetic
+// numbers like 103.58560 or 103.83966 (neither value ever traded).
 
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { checkTrailingStop } from "./src/pricing";
 
 type Kline = [number, string, string, string, string, ...unknown[]]; // [openTime, o, h, l, c, ...]
+type AggTrade = { p: string; T: number; q?: string; m?: boolean };
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REAL_CLUSDT_TRADES: AggTrade[] = JSON.parse(
+  readFileSync(resolve(HERE, "test-fixtures/aggtrades_clusdt.json"), "utf8"),
+);
 
 // ---------------------------------------------------------------------------
 // Tiny assertion helpers
@@ -41,20 +44,16 @@ function assertTrue(actual: boolean, label: string) {
   console.log(`  ${actual ? "✅" : "❌"} ${label}: ${actual ? "ok" : "expected true, got false"}`);
   if (!actual) failures++;
 }
+function assertFalse(actual: boolean, label: string) {
+  console.log(`  ${!actual ? "✅" : "❌"} ${label}: ${!actual ? "ok" : "expected false, got true"}`);
+  if (actual) failures++;
+}
 
 // ---------------------------------------------------------------------------
 // Fixture builder
 // ---------------------------------------------------------------------------
 function ts(s: string): number {
   return Date.parse(s + "Z");
-}
-
-/**
- * Build a 1s kline for [openTimeMs, openTimeMs+1000) with given OHLC.
- * Binance returns volume etc. but our parser only reads indices 0–4.
- */
-function k1s(openTimeMs: number, o: number, h: number, l: number, c: number): Kline {
-  return [openTimeMs, String(o), String(h), String(l), String(c)];
 }
 function k1m(openTimeMs: number, o: number, h: number, l: number, c: number): Kline {
   return [openTimeMs, String(o), String(h), String(l), String(c)];
@@ -78,87 +77,84 @@ function installFetch(routes: Route[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Test 1 — Last Price BUY (the CLUSDT bug case)
+// Test 1 — Last Price BUY (CLUSDT, REAL aggTrades from Binance)
 // ---------------------------------------------------------------------------
-async function testLastPriceBuy() {
-  console.log("\nTEST 1: Last Price BUY trailing — CLUSDT exact user window");
+async function testLastPriceBuyReal() {
+  console.log("\nTEST 1: Last Price BUY trailing — CLUSDT real aggTrades fixture");
 
-  const start = ts("2026-05-01 11:55:00");
-  // Build a 20-minute window of 1s candles. The relevant slice:
-  //   12:12:26 — first second whose low touches 103.86 (activation)
-  //   12:13:03 — low reaches 103.58560 (trough)
-  //   12:13:07 — high reaches 103.83966 (trigger)
-  const candles: Kline[] = [];
-  // From 11:55 → 12:12:25 price floats around 104.10 (no activation)
-  for (let t = start; t < ts("2026-05-01 12:12:26"); t += 1000) {
-    candles.push(k1s(t, 104.10, 104.12, 104.08, 104.10));
-  }
-  // 12:12:26 — drops to 103.86 (activation)
-  candles.push(k1s(ts("2026-05-01 12:12:26"), 104.05, 104.05, 103.86, 103.86));
-  // 12:12:27 → 12:13:02 — slow drift down to 103.65
-  let p = 103.86;
-  for (let t = ts("2026-05-01 12:12:27"); t < ts("2026-05-01 12:13:03"); t += 1000) {
-    const next = Math.max(103.65, p - 0.005);
-    candles.push(k1s(t, p, p, next, next));
-    p = next;
-  }
-  // 12:13:03 — punches the trough at 103.58560
-  candles.push(k1s(ts("2026-05-01 12:13:03"), p, p, 103.58560, 103.58560));
-  // 12:13:04 → 12:13:06 — bounces up but not enough yet
-  candles.push(k1s(ts("2026-05-01 12:13:04"), 103.58560, 103.65, 103.58560, 103.65));
-  candles.push(k1s(ts("2026-05-01 12:13:05"), 103.65, 103.75, 103.65, 103.75));
-  candles.push(k1s(ts("2026-05-01 12:13:06"), 103.75, 103.83, 103.75, 103.83));
-  // 12:13:07 — high crosses 103.83966 → triggers
-  candles.push(k1s(ts("2026-05-01 12:13:07"), 103.83, 103.86, 103.83, 103.85));
-  // 12:13:08 → 12:14:00 (filler so the algorithm has data past the trigger)
-  for (let t = ts("2026-05-01 12:13:08"); t <= ts("2026-05-01 12:14:00"); t += 1000) {
-    candles.push(k1s(t, 103.85, 103.90, 103.80, 103.88));
-  }
-
-  // The aggTrade refinement window pulls trades for [peakTs, triggerTs+1999].
-  // Provide ticks for 12:13:03 → 12:13:08 with the actual cross at 12:13:07.
-  const trades = [
-    { p: "103.58560", T: ts("2026-05-01 12:13:03") + 200 },
-    { p: "103.60000", T: ts("2026-05-01 12:13:03") + 800 },
-    { p: "103.65000", T: ts("2026-05-01 12:13:04") + 100 },
-    { p: "103.75000", T: ts("2026-05-01 12:13:05") + 500 },
-    { p: "103.83000", T: ts("2026-05-01 12:13:06") + 900 },
-    { p: "103.83900", T: ts("2026-05-01 12:13:07") + 50 },
-    { p: "103.83966", T: ts("2026-05-01 12:13:07") + 350 }, // <— the crossing tick
-    { p: "103.85000", T: ts("2026-05-01 12:13:07") + 700 },
-  ];
+  let oneSecondKlineCalls = 0;
+  let aggTradeCalls = 0;
 
   installFetch([
     (u) => {
-      if (u.pathname === "/fapi/v1/klines" && u.searchParams.get("interval") === "1s") {
-        const startQ = Number(u.searchParams.get("startTime"));
-        const endQ = Number(u.searchParams.get("endTime"));
-        return candles.filter(c => c[0] >= startQ && c[0] < endQ).slice(0, 1500);
+      // For Futures Last Price the new code path MUST NOT call /fapi/v1/klines
+      // (Binance Futures does not support interval=1s). If this route ever
+      // matches, the assertion at the end will fail.
+      if (u.pathname === "/fapi/v1/klines") {
+        oneSecondKlineCalls++;
+        return [];
       }
       return undefined;
     },
     (u) => {
       if (u.pathname === "/fapi/v1/aggTrades") {
+        aggTradeCalls++;
         const s = Number(u.searchParams.get("startTime"));
         const e = Number(u.searchParams.get("endTime"));
-        return trades.filter(t => t.T >= s && t.T <= e);
+        return REAL_CLUSDT_TRADES.filter(t => t.T >= s && t.T <= e);
       }
       return undefined;
     },
   ]);
 
-  const data = await checkTrailingStop("CLUSDT", "2026-05-01 11:52:17", "2026-05-01 12:13:07", 103.86, 0.25, "long", "futures", "last");
+  // Real CLUSDT trailing stop case:
+  //   activation 103.86, callback 0.25%, BUY trailing (closes a SHORT)
+  //   user window: 2026-05-01 12:12:17 → 12:13:07 UTC (the bug-report window)
+  const fromStr = "2026-05-01 12:12:17";
+  const toStr = "2026-05-01 12:13:07";
+  const fromMs = ts(fromStr);
+  const toMs = ts(toStr);
+  const toInclusiveMs = Math.floor(toMs / 1000) * 1000 + 999;
+
+  const data = await checkTrailingStop("CLUSDT", fromStr, toStr, 103.86, 0.25, "long", "futures", "last");
 
   assertEq(data.status, "triggered", "status === triggered");
   assertEq(data.dataSource, "last", "dataSource === last");
-  assertEq(data.granularity, "1s", "granularity === 1s");
+  assertEq(data.granularity, "aggTrades", "granularity === aggTrades (Futures Last Price)");
   assertEq(data.fellBackTo1m, false, "fellBackTo1m === false");
-  assertEq(data.isApproximate, false, "isApproximate === false");
-  assertMatch(data.activationTime, /2026-05-01 12:12:26/, "activationTime starts at 12:12:26");
-  assertClose(data.peakPrice as number, 103.58560, 1e-6, "trough = 103.58560");
-  assertMatch(data.peakTime, /2026-05-01 12:13:03/, "peakTime is 12:13:03");
-  assertMatch(data.triggerTime, /2026-05-01 12:13:07/, "triggerTime is 12:13:07");
-  assertClose(data.triggerPrice as number, 103.58560 * 1.0025, 1e-4, "triggerPrice ≈ 103.58560 × 1.0025");
+  assertEq(data.isApproximate, false, "isApproximate === false (tick precision)");
+  assertMatch(data.dataSourceLabel, /aggTrades, tick precision/, "dataSourceLabel mentions tick precision");
+
+  // The new path skips 1s klines entirely on Futures; aggTrades MUST be the
+  // only price source the algorithm hits.
+  assertEq(oneSecondKlineCalls, 0, "Futures Last Price never calls /fapi/v1/klines");
+  assertTrue(aggTradeCalls > 0, "aggTrades was queried at least once");
+
+  // Activation: first tick whose price ≤ 103.86 after `from`. In the captured
+  // tape that is 2026-05-01 12:12:26.062 at 103.86.
+  assertMatch(data.activationTime, /2026-05-01 12:12:26/, "activationTime is 12:12:26");
+  assertClose(data.activationPriceObserved as number, 103.86, 1e-6, "activation observed price = 103.86");
+
+  // True trough = 103.58 flat at 12:13:07.615 UTC. Note: 103.58560 NEVER
+  // appears in the tape and must not be asserted anywhere.
+  assertClose(data.peakPrice as number, 103.58, 1e-6, "True trough = 103.58 (flat, not 103.58560)");
+  assertMatch(data.peakTime, /2026-05-01 12:13:07/, "trough timestamp is 12:13:07 (real tick at .615)");
+  assertEq(data.peakTs, ts("2026-05-01 12:13:07") + 615, "trough ms timestamp = 12:13:07.615");
+
+  // Required threshold = 103.58 × 1.0025 = 103.83895.
+  assertClose(data.triggerPrice as number, 103.58 * 1.0025, 1e-6, "trigger threshold = 103.58 × 1.0025 = 103.83895");
+
+  // First trade ≥ threshold = 103.84 at 12:13:07.660 UTC (a real aggTrade).
+  // 103.83966 NEVER traded and must not appear.
+  assertClose(data.triggerObservedPrice as number, 103.84, 1e-6, "first crossing trade = 103.84 (real tick)");
+  assertMatch(data.triggerTime, /2026-05-01 12:13:07/, "trigger timestamp is 12:13:07");
+  assertEq(data.triggerTs, ts("2026-05-01 12:13:07") + 660, "trigger ms timestamp = 12:13:07.660");
+
+  // Window-boundary safety: every result timestamp must fall inside [from, to].
+  assertTrue((data.activationTs as number) >= fromMs, "activationTs >= From");
+  assertTrue((data.activationTs as number) <= toInclusiveMs, "activationTs <= To (inclusive of second)");
+  assertTrue((data.peakTs as number) <= toInclusiveMs, "peakTs <= To");
+  assertTrue((data.triggerTs as number) <= toInclusiveMs, "triggerTs <= To");
 }
 
 // ---------------------------------------------------------------------------
@@ -197,8 +193,9 @@ async function testMarkPriceBuy() {
   assertEq(data.granularity, "1m", "granularity === 1m");
   assertEq(data.isApproximate, true, "isApproximate === true (Mark always approx)");
   assertEq(data.fellBackTo1m, false, "fellBackTo1m === false (Mark, not a fallback)");
-  // CONSERVATIVE ordering for BUY = [o, l, h, cl]:
-  //   12:14 candle: o=103.83 → l=103.58 (trough updates to 103.58) → h=103.97 (dev=0.336% ≥ 0.25%, trigger).
+  // CONSERVATIVE ordering for BUY: trough updates from candle low first,
+  // then trigger probe uses candle high. 12:14 high (103.97) crosses
+  // threshold 103.58 × 1.0025 = 103.83895.
   assertClose(data.peakPrice as number, 103.58, 1e-6, "trough = 103.58");
   assertMatch(data.peakTime, /2026-05-01 12:1(3|4):00/, "peakTime is 12:13 or 12:14");
   assertMatch(data.triggerTime, /2026-05-01 12:14:00/, "triggerTime is 12:14:00 (1m resolution)");
@@ -206,57 +203,60 @@ async function testMarkPriceBuy() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 3 — Last Price SELL (mirror logic — track peak)
+// Test 3 — Last Price SELL (futures, aggTrades — track peak, trigger on drop)
 // ---------------------------------------------------------------------------
-async function testLastPriceSell() {
-  console.log("\nTEST 3: Last Price SELL trailing (mirror) — track peak, trigger on drop");
+async function testLastPriceSellAggTrades() {
+  console.log("\nTEST 3: Last Price SELL trailing (Futures, aggTrades)");
 
   // Activation 100.00, callback 0.30%, direction SHORT (sell trailing).
-  // Activation when price ≥ 100.00. Then track peak. Trigger when price drops
-  // by 0.30% from peak.
-  const candles: Kline[] = [];
-  // Pre-activation: price hovers at 99.50
-  for (let t = ts("2026-05-01 10:00:00"); t < ts("2026-05-01 10:05:00"); t += 1000) {
-    candles.push(k1s(t, 99.50, 99.55, 99.45, 99.50));
-  }
-  // 10:05:00 — punches through 100.00 (activation)
-  candles.push(k1s(ts("2026-05-01 10:05:00"), 99.95, 100.00, 99.95, 100.00));
-  // 10:05:01 → 10:05:30 — climbs to 101.00 (peak)
-  let cur = 100.00;
-  for (let t = ts("2026-05-01 10:05:01"); t < ts("2026-05-01 10:05:31"); t += 1000) {
-    const next = Math.min(101.00, cur + 0.04);
-    candles.push(k1s(t, cur, next, cur, next));
-    cur = next;
-  }
-  // 10:05:31 onwards — pulls back. Peak = 101.00, trigger at 101.00 × 0.997 = 100.697.
-  candles.push(k1s(ts("2026-05-01 10:05:31"), 101.00, 101.00, 100.85, 100.85));
-  candles.push(k1s(ts("2026-05-01 10:05:32"), 100.85, 100.85, 100.75, 100.75));
-  candles.push(k1s(ts("2026-05-01 10:05:33"), 100.75, 100.75, 100.69, 100.69)); // triggers (100.69 < 100.697)
-  for (let t = ts("2026-05-01 10:05:34"); t <= ts("2026-05-01 10:06:00"); t += 1000) {
-    candles.push(k1s(t, 100.69, 100.70, 100.60, 100.65));
-  }
+  // Trigger threshold = peak × (1 − 0.003).
+  const trades: AggTrade[] = [
+    // Pre-activation
+    { p: "99.50", T: ts("2026-05-01 10:00:00") + 100 },
+    { p: "99.80", T: ts("2026-05-01 10:04:50") + 200 },
+    // Activation: first trade ≥ 100.00
+    { p: "100.00", T: ts("2026-05-01 10:05:00") + 50 },
+    // Climb to peak 101.00
+    { p: "100.50", T: ts("2026-05-01 10:05:10") + 100 },
+    { p: "100.85", T: ts("2026-05-01 10:05:20") + 100 },
+    { p: "101.00", T: ts("2026-05-01 10:05:30") + 250 }, // peak
+    // Pull back; threshold = 101.00 × 0.997 = 100.697
+    { p: "100.85", T: ts("2026-05-01 10:05:31") + 100 },
+    { p: "100.75", T: ts("2026-05-01 10:05:32") + 100 },
+    { p: "100.69", T: ts("2026-05-01 10:05:33") + 400 }, // first trade ≤ 100.697
+    { p: "100.55", T: ts("2026-05-01 10:05:34") + 100 },
+  ];
 
+  let oneSecondKlineCalls = 0;
   installFetch([
     (u) => {
-      if (u.pathname === "/fapi/v1/klines" && u.searchParams.get("interval") === "1s") {
-        const s = Number(u.searchParams.get("startTime"));
-        const e = Number(u.searchParams.get("endTime"));
-        return candles.filter(c => c[0] >= s && c[0] < e).slice(0, 1500);
+      if (u.pathname === "/fapi/v1/klines") {
+        oneSecondKlineCalls++;
+        return [];
       }
       return undefined;
     },
-    (u) => (u.pathname === "/fapi/v1/aggTrades" ? [] : undefined),
+    (u) => {
+      if (u.pathname === "/fapi/v1/aggTrades") {
+        const s = Number(u.searchParams.get("startTime"));
+        const e = Number(u.searchParams.get("endTime"));
+        return trades.filter(t => t.T >= s && t.T <= e);
+      }
+      return undefined;
+    },
   ]);
 
   const data = await checkTrailingStop("XYZUSDT", "2026-05-01 10:00:00", "2026-05-01 10:06:00", 100.00, 0.30, "short", "futures", "last");
 
   assertEq(data.status, "triggered", "status === triggered");
   assertEq(data.dataSource, "last", "dataSource === last");
-  assertEq(data.granularity, "1s", "granularity === 1s");
-  assertClose(data.peakPrice as number, 101.00, 1e-6, "peak = 101.00");
+  assertEq(data.granularity, "aggTrades", "granularity === aggTrades");
+  assertEq(oneSecondKlineCalls, 0, "Futures SELL never calls /fapi/v1/klines");
+  assertClose(data.peakPrice as number, 101.00, 1e-6, "True peak = 101.00");
   assertMatch(data.activationTime, /2026-05-01 10:05:00/, "activationTime is 10:05:00");
   assertMatch(data.triggerTime, /2026-05-01 10:05:33/, "triggerTime is 10:05:33");
-  assertClose(data.triggerPrice as number, 101.00 * 0.997, 1e-4, "triggerPrice = 101.00 × 0.997 = 100.697");
+  assertClose(data.triggerPrice as number, 101.00 * 0.997, 1e-6, "triggerPrice = 101.00 × 0.997 = 100.697");
+  assertClose(data.triggerObservedPrice as number, 100.69, 1e-6, "first crossing tick = 100.69");
 }
 
 // ---------------------------------------------------------------------------
@@ -300,38 +300,29 @@ async function testMarkPriceSell() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 5 — Last Price falls back to aggTrades, never 1m
+// Test 5 — Futures Last Price MUST NOT call /fapi/v1/klines (any interval)
 // ---------------------------------------------------------------------------
-async function testLastAggTradesFallback() {
-  console.log("\nTEST 5: Last Price → 1s empty → aggTrades fallback, never 1m");
+async function testFuturesNeverCallsKlines() {
+  console.log("\nTEST 5: Futures Last Price never calls /fapi/v1/klines (1s is unsupported)");
 
-  let oneMinuteKlineCalls = 0;
-  const trades = [
-    { p: "104.10000", T: ts("2026-05-01 12:12:25") },
-    { p: "103.86000", T: ts("2026-05-01 12:12:26") },
-    { p: "103.58560", T: ts("2026-05-01 12:13:03") },
-    { p: "103.83000", T: ts("2026-05-01 12:13:06") },
-    { p: "103.84457", T: ts("2026-05-01 12:13:07") },
-  ];
-
+  let klineCalls = 0;
   installFetch([
     (u) => {
-      if (u.pathname === "/fapi/v1/klines" && u.searchParams.get("interval") === "1s") {
+      if (u.pathname === "/fapi/v1/klines") {
+        klineCalls++;
         return [];
-      }
-      if (u.pathname === "/fapi/v1/klines" && u.searchParams.get("interval") === "1m") {
-        oneMinuteKlineCalls++;
-        return [
-          k1m(ts("2026-05-01 12:14:00"), 103.80, 103.90, 102.60, 102.85),
-        ];
       }
       return undefined;
     },
     (u) => {
       if (u.pathname === "/fapi/v1/aggTrades") {
-        const s = Number(u.searchParams.get("startTime"));
-        const e = Number(u.searchParams.get("endTime"));
-        return trades.filter(t => t.T >= s && t.T <= e);
+        // Cheap synthetic tape: just enough to activate + trigger.
+        return [
+          { p: "104.00", T: ts("2026-05-01 12:12:25") + 0 },
+          { p: "103.86", T: ts("2026-05-01 12:12:26") + 0 },
+          { p: "103.58", T: ts("2026-05-01 12:13:03") + 0 },
+          { p: "103.84", T: ts("2026-05-01 12:13:07") + 0 },
+        ];
       }
       return undefined;
     },
@@ -342,44 +333,51 @@ async function testLastAggTradesFallback() {
   assertEq(data.status, "triggered", "status === triggered");
   assertEq(data.dataSource, "last", "dataSource === last");
   assertEq(data.granularity, "aggTrades", "granularity === aggTrades");
+  assertEq(klineCalls, 0, "ZERO klines calls for Futures Last Price (no dead 1s round-trip)");
   assertEq(data.fellBackTo1m, false, "fellBackTo1m === false");
-  assertEq(data.isApproximate, false, "isApproximate === false");
-  assertEq(oneMinuteKlineCalls, 0, "Last Price never calls 1m klines");
-  assertMatch(data.activationTime, /2026-05-01 12:12:26/, "activationTime is 12:12:26");
-  assertMatch(data.triggerTime, /2026-05-01 12:13:07/, "triggerTime is 12:13:07");
-  assertClose(data.peakPrice as number, 103.58560, 1e-6, "trough = 103.58560");
 }
 
 // ---------------------------------------------------------------------------
-// Test 6 — Last Price strict To boundary
+// Test 6 — Last Price strict To boundary (Futures, aggTrades)
 // ---------------------------------------------------------------------------
 async function testLastWindowBoundary() {
-  console.log("\nTEST 6: Last Price boundary — ignore data after user-supplied To");
+  console.log("\nTEST 6: Last Price boundary — ignore ticks after user-supplied To");
 
-  const candles: Kline[] = [
-    k1s(ts("2026-05-01 12:12:26"), 104.00, 104.00, 103.86, 103.86),
-    k1s(ts("2026-05-01 12:13:00"), 103.86, 103.86, 103.70, 103.75),
-    k1s(ts("2026-05-01 12:13:07"), 103.75, 103.80, 103.72, 103.78),
-    // This is the bad candle that caused the original 12:14 leak.
-    k1s(ts("2026-05-01 12:14:00"), 103.78, 102.90, 102.60, 102.85),
+  const trades: AggTrade[] = [
+    { p: "104.00", T: ts("2026-05-01 12:12:26") + 0 },
+    { p: "103.86", T: ts("2026-05-01 12:12:26") + 50 }, // activation
+    { p: "103.80", T: ts("2026-05-01 12:13:00") + 100 },
+    { p: "103.70", T: ts("2026-05-01 12:13:00") + 500 }, // trough inside window
+    { p: "103.78", T: ts("2026-05-01 12:13:07") + 100 },
+    // The route below would normally be ignored (after To). The mock would
+    // include it if the algorithm asked for trades past the boundary; the mock
+    // filters by startTime/endTime so it should never get returned anyway.
+    { p: "102.60", T: ts("2026-05-01 12:14:00") + 100 },
+    { p: "104.00", T: ts("2026-05-01 12:14:30") + 100 },
   ];
 
   installFetch([
+    (u) => (u.pathname === "/fapi/v1/klines" ? [] : undefined),
     (u) => {
-      if (u.pathname === "/fapi/v1/klines" && u.searchParams.get("interval") === "1s") {
-        return candles; // Intentionally return out-of-window data.
+      if (u.pathname === "/fapi/v1/aggTrades") {
+        const s = Number(u.searchParams.get("startTime"));
+        const e = Number(u.searchParams.get("endTime"));
+        return trades.filter(t => t.T >= s && t.T <= e);
       }
       return undefined;
     },
-    (u) => (u.pathname === "/fapi/v1/aggTrades" ? [] : undefined),
   ]);
 
-  const toMs = ts("2026-05-01 12:13:07");
-  const data = await checkTrailingStop("CLUSDT", "2026-05-01 12:12:17", "2026-05-01 12:13:07", 103.86, 0.25, "long", "futures", "last");
+  const fromStr = "2026-05-01 12:12:17";
+  const toStr = "2026-05-01 12:13:07";
+  const toMs = ts(toStr);
+  const toInclusiveMs = Math.floor(toMs / 1000) * 1000 + 999;
+  const data = await checkTrailingStop("CLUSDT", fromStr, toStr, 103.86, 0.25, "long", "futures", "last");
 
-  assertEq(data.status, "activated_no_trigger", "status === activated_no_trigger");
-  assertClose(data.peakPrice as number, 103.70, 1e-6, "trough ignores 12:14 low");
-  assertTrue((data.activationTs as number) <= toMs + 999, "activation timestamp is inside window");
+  assertEq(data.status, "activated_no_trigger", "status === activated_no_trigger (rebound 0.077% < 0.25%)");
+  assertClose(data.peakPrice as number, 103.70, 1e-6, "trough = 103.70 (the post-To 102.60 must be ignored)");
+  assertTrue((data.activationTs as number) <= toInclusiveMs, "activation timestamp is inside window");
+  assertTrue((data.peakTs as number) <= toInclusiveMs, "trough timestamp is inside window");
   assertTrue(data.triggerTs == null, "no trigger timestamp outside To");
 }
 
@@ -417,17 +415,52 @@ async function testMarkWindowBoundary() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 8 — Spot Last Price still uses 1s klines (Spot supports interval=1s)
+// ---------------------------------------------------------------------------
+async function testSpotStillUses1sKlines() {
+  console.log("\nTEST 8: Spot Last Price still attempts /api/v3/klines interval=1s");
+
+  let oneSecondKlineCalls = 0;
+  const candles: Kline[] = [
+    [ts("2026-05-01 10:05:00"), "99.95", "100.00", "99.95", "100.00"],
+    [ts("2026-05-01 10:05:30"), "100.50", "101.00", "100.50", "101.00"],
+    [ts("2026-05-01 10:05:33"), "101.00", "101.00", "100.69", "100.69"],
+  ];
+
+  installFetch([
+    (u) => {
+      if (u.pathname === "/api/v3/klines" && u.searchParams.get("interval") === "1s") {
+        oneSecondKlineCalls++;
+        const s = Number(u.searchParams.get("startTime"));
+        const e = Number(u.searchParams.get("endTime"));
+        return candles.filter(c => c[0] >= s && c[0] < e);
+      }
+      return undefined;
+    },
+    (u) => (u.pathname === "/api/v3/aggTrades" ? [] : undefined),
+  ]);
+
+  const data = await checkTrailingStop("XYZUSDT", "2026-05-01 10:00:00", "2026-05-01 10:06:00", 100.00, 0.30, "short", "spot", "last");
+
+  assertEq(data.status, "triggered", "status === triggered");
+  assertEq(data.granularity, "1s", "granularity === 1s (Spot path preserved)");
+  assertTrue(oneSecondKlineCalls > 0, "Spot Last Price DID call /api/v3/klines interval=1s");
+  assertMatch(data.dataSourceLabel, /1s klines/, "dataSourceLabel mentions 1s klines (Spot)");
+}
+
+// ---------------------------------------------------------------------------
 // Run
 // ---------------------------------------------------------------------------
 (async () => {
   console.log("=== Trailing Stop algorithm tests ===");
-  await testLastPriceBuy();
+  await testLastPriceBuyReal();
   await testMarkPriceBuy();
-  await testLastPriceSell();
+  await testLastPriceSellAggTrades();
   await testMarkPriceSell();
-  await testLastAggTradesFallback();
+  await testFuturesNeverCallsKlines();
   await testLastWindowBoundary();
   await testMarkWindowBoundary();
+  await testSpotStillUses1sKlines();
 
   console.log(`\n${failures === 0 ? "✅ All assertions passed" : `❌ ${failures} assertion(s) failed`}`);
   process.exit(failures === 0 ? 0 : 1);

@@ -731,7 +731,8 @@ function trailingCandleInfo(c) {
 
 function trailingSourceLabel(priceType, granularity) {
   if (priceType === "mark") return "Mark Price (1m markPriceKlines)";
-  if (granularity === "aggTrades") return "Last Price (aggTrades fallback)";
+  if (granularity === "aggTrades") return "Last Price (aggTrades, tick precision)";
+  // Spot only — Binance Futures klines does not support interval=1s.
   return "Last Price (1s klines)";
 }
 
@@ -1073,9 +1074,12 @@ function analyzeMarkTrailingStopCandles(candles, opts) {
 /**
  * Trailing Stop Simulation (Binance Futures logic)
  *
- * Last Price orders are analyzed from /fapi/v1/klines interval=1s. If 1s
- * klines are unavailable, the only fallback is aggTrades. Last Price never
- * falls back to 1m candles.
+ * Futures Last Price orders are analyzed directly from /fapi/v1/aggTrades
+ * (tick precision). Binance Futures klines does not support interval=1s
+ * (returns code -1120 "Invalid interval."), so we never attempt that call.
+ *
+ * Spot Last Price orders try /api/v3/klines interval=1s first (which Spot
+ * supports) and fall back to /api/v3/aggTrades if 1s klines are empty.
  *
  * Mark Price orders use /fapi/v1/markPriceKlines interval=1m because Binance
  * does not expose sub-minute historical Mark Price data. For BUY trailing,
@@ -1128,29 +1132,34 @@ export async function checkTrailingStop(symbol, fromStr, toStr, activationPrice,
 
   const fetchStart = Math.floor(startMs / 1000) * 1000;
   const fetchEnd = Math.floor(endMs / 1000) * 1000 + 1000;
-  let candles = [];
 
-  try {
-    candles = await fetchAllKlines("last", normalizedSymbol, fetchStart, fetchEnd, market, "1s");
-  } catch (_e) {
-    candles = [];
-  }
+  // Spot supports interval=1s on klines; Futures does not (Binance returns
+  // -1120 "Invalid interval"). For Futures we go straight to aggTrades, which
+  // is the correct tick-precision source for Last Price anyway.
+  if (market !== "futures") {
+    let candles = [];
+    try {
+      candles = await fetchAllKlines("last", normalizedSymbol, fetchStart, fetchEnd, market, "1s");
+    } catch (_e) {
+      candles = [];
+    }
 
-  if (candles.length) {
-    const points = buildLastKlineTrailingPoints(candles, direction, startMs, endMs);
-    if (points.length) {
-      return analyzeTrailingStopPoints(points, {
-        symbol: normalizedSymbol,
-        fromStr,
-        toStr,
-        direction,
-        priceType: "last",
-        granularity: "1s",
-        activationPrice,
-        callbackRate,
-        startMs,
-        endMs,
-      });
+    if (candles.length) {
+      const points = buildLastKlineTrailingPoints(candles, direction, startMs, endMs);
+      if (points.length) {
+        return analyzeTrailingStopPoints(points, {
+          symbol: normalizedSymbol,
+          fromStr,
+          toStr,
+          direction,
+          priceType: "last",
+          granularity: "1s",
+          activationPrice,
+          callbackRate,
+          startMs,
+          endMs,
+        });
+      }
     }
   }
 
