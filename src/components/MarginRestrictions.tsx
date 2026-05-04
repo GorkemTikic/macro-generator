@@ -250,16 +250,16 @@ export default function MarginRestrictions({ lang }: { lang: string }) {
 
       {/* Mode tabs */}
       <label className="label">{isTr ? "Mod" : "Mode"}</label>
-      <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
-        <div className={`option-card ${mode === "check" ? "active" : ""}`} onClick={() => setMode("check")}>
+      <div className="option-cards" role="tablist" aria-label={isTr ? "Mod" : "Mode"} style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+        <button type="button" role="tab" aria-selected={mode === "check"} className={`option-card ${mode === "check" ? "active" : ""}`} onClick={() => setMode("check")}>
           <span>{isTr ? "Kısıtlama Kontrolü" : "Restriction Check"}</span>
-        </div>
-        <div className={`option-card ${mode === "list" ? "active" : ""}`} onClick={() => setMode("list")}>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === "list"} className={`option-card ${mode === "list" ? "active" : ""}`} onClick={() => setMode("list")}>
           <span>{isTr ? "Tam Liste" : "Full List"}</span>
-        </div>
-        <div className={`option-card ${mode === "history" ? "active" : ""}`} onClick={() => setMode("history")}>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === "history"} className={`option-card ${mode === "history" ? "active" : ""}`} onClick={() => setMode("history")}>
           <span>{isTr ? "Değişim Günlüğü" : "Changes"}</span>
-        </div>
+        </button>
       </div>
 
       {/* RESTRICTION CHECK */}

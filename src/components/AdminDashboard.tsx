@@ -2,8 +2,17 @@ import React, { useState, useCallback, useEffect } from 'react';
 // exceljs is heavy (~600 KB). Load it on demand from handleExport instead of
 // pulling it into the main bundle for every page view.
 import type { ExportPayload } from '../analytics/exportWorkbook';
+import { TAB_LABELS, type Tab } from '../analytics';
 
-const ENDPOINT = (import.meta.env.VITE_ANALYTICS_URL ?? '').replace(/\/$/, '');
+// Same dev/prod split as src/analytics/index.ts:
+//   dev   → ENDPOINT = ""       (Vite dev proxy forwards /admin/* to Worker)
+//   prod  → ENDPOINT = env var  (browser → Worker, Worker's ALLOWED_ORIGIN
+//                                accepts the GitHub Pages origin).
+const _ENV = ((import.meta as unknown as { env?: ImportMetaEnv }).env) ?? ({} as ImportMetaEnv);
+const ENDPOINT = (_ENV.DEV ? '' : (_ENV.VITE_ANALYTICS_URL ?? '')).replace(/\/$/, '');
+// In dev we always have a working endpoint (the Vite proxy). In prod the
+// dashboard requires VITE_ANALYTICS_URL to have been set at build time.
+const ENDPOINT_AVAILABLE = _ENV.DEV || !!_ENV.VITE_ANALYTICS_URL;
 const TOKEN_KEY = '_fd_admin_token';
 
 // ---------------------------------------------------------------------------
@@ -88,26 +97,28 @@ function propsStr(raw: string) {
 function HBar({ label, value, max, color = 'var(--accent)' }: { label: string; value: number; max: number; color?: string }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-      <div style={{ width: 130, fontSize: 12, color: 'var(--muted)', textAlign: 'right', flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>
-        {label}
-      </div>
-      <div style={{ flex: 1, background: 'rgba(255,255,255,0.06)', borderRadius: 4, height: 20, overflow: 'hidden', minWidth: 80 }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: 4, transition: 'width 0.5s ease', minWidth: pct > 0 ? 4 : 0 }} />
-      </div>
-      <div style={{ width: 36, fontSize: 12, color: 'var(--text)', textAlign: 'right', flexShrink: 0 }}>{value}</div>
+    <div className="hbar">
+      <span className="lbl" title={label}>{label}</span>
+      <span className="track">
+        <span style={{ width: `${pct}%`, background: color }} />
+      </span>
+      <span className="val num">{value}</span>
     </div>
   );
 }
 
-function HBarChart({ data, keyField, valueField, color }: { data: NameCount[]; keyField: string; valueField: string; color?: string }) {
+function HBarChart({ data, keyField, valueField, color, labelMap }: { data: NameCount[]; keyField: string; valueField: string; color?: string; labelMap?: Readonly<Record<string, string>> }) {
   if (!data || data.length === 0) return <p className="muted-sm">No data yet.</p>;
   const max = Math.max(...data.map(d => Number(d[valueField]) || 0));
   return (
     <div>
-      {data.map((d, i) => (
-        <HBar key={i} label={String(d[keyField] ?? '—')} value={Number(d[valueField]) || 0} max={max} color={color} />
-      ))}
+      {data.map((d, i) => {
+        const raw = String(d[keyField] ?? '—');
+        const label = labelMap?.[raw] ?? raw;
+        return (
+          <HBar key={i} label={label} value={Number(d[valueField]) || 0} max={max} color={color} />
+        );
+      })}
     </div>
   );
 }
@@ -137,15 +148,15 @@ function DailyChart({ data, range }: { data: DailyRow[]; range: Range }) {
           const showLabel = n <= 14 || i % Math.ceil(n / 14) === 0;
           return (
             <g key={i}>
-              {barH > 0 && <rect x={x} y={y} width={bw} height={barH} fill="var(--accent)" rx={2} opacity={0.85} />}
+              {barH > 0 && <rect x={x} y={y} width={bw} height={barH} fill="var(--accent)" rx={2} opacity={0.92} />}
               {showLabel && (
-                <text x={x + bw / 2} y={H + 18} fontSize={9} fill="var(--muted)" textAnchor="middle">{d.day.slice(5)}</text>
+                <text x={x + bw / 2} y={H + 18} fontSize={10} fill="var(--text-3)" textAnchor="middle" fontFamily="var(--font-mono)">{d.day.slice(5)}</text>
               )}
               <title>{`${d.day}: ${d.sessions} sessions, ${d.events} events`}</title>
             </g>
           );
         })}
-        <line x1={0} y1={H} x2={W} y2={H} stroke="rgba(255,255,255,0.08)" strokeWidth={1} />
+        <line x1={0} y1={H} x2={W} y2={H} stroke="var(--line-2)" strokeWidth={1} />
       </svg>
     </div>
   );
@@ -197,7 +208,7 @@ function EventsTable({ events }: { events: EventRow[] }) {
             <tr key={e.id}>
               <td style={{ whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmtTime(e.ts)}</td>
               <td><span className="evt-badge">{e.event_type}</span></td>
-              <td>{e.tab || '—'}</td>
+              <td>{e.tab ? (TAB_LABELS[e.tab as Tab] ?? e.tab) : '—'}</td>
               <td>{e.country || '—'}</td>
               <td style={{ fontSize: 11, color: 'var(--muted)', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                   title={propsStr(e.props)}>{propsStr(e.props)}</td>
@@ -324,7 +335,7 @@ export default function AdminDashboard() {
   const authHeader = (tok: string) => ({ Authorization: `Bearer ${tok}` });
 
   const fetchStats = useCallback(async (tok: string, r: Range) => {
-    if (!ENDPOINT) { setError('VITE_ANALYTICS_URL is not configured.'); return; }
+    if (!ENDPOINT_AVAILABLE) { setError('VITE_ANALYTICS_URL is not configured.'); return; }
     setLoading(true); setError('');
     try {
       const since = Date.now() - sinceMs(r);
@@ -339,11 +350,12 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchEvents = useCallback(async (tok: string, r: Range) => {
-    if (!ENDPOINT) return;
+    if (!ENDPOINT_AVAILABLE) return;
     setLoading(true); setError('');
     try {
       const since = Date.now() - sinceMs(r);
       const res   = await fetch(`${ENDPOINT}/admin/events?since=${since}&limit=200`, { headers: authHeader(tok) });
+      if (res.status === 401) { setError('Invalid admin token.'); setAuthed(false); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data  = await res.json();
       setEvents(data.events || []);
@@ -352,11 +364,12 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchDevices = useCallback(async (tok: string, r: Range) => {
-    if (!ENDPOINT) return;
+    if (!ENDPOINT_AVAILABLE) return;
     setLoading(true); setError('');
     try {
       const since = Date.now() - sinceMs(r);
       const res   = await fetch(`${ENDPOINT}/admin/devices?since=${since}`, { headers: authHeader(tok) });
+      if (res.status === 401) { setError('Invalid admin token.'); setAuthed(false); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data  = await res.json();
       setDevices(data.devices || []);
@@ -365,15 +378,24 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchDeviceEvents = useCallback(async (tok: string, deviceId: string, r: Range) => {
-    if (!ENDPOINT) return;
+    if (!ENDPOINT_AVAILABLE) return;
     setLoadingDevice(true);
     try {
       const since = Date.now() - sinceMs(r);
       const res   = await fetch(`${ENDPOINT}/admin/devices?device_id=${encodeURIComponent(deviceId)}&since=${since}&limit=100`, { headers: authHeader(tok) });
+      if (res.status === 401) {
+        setError('Invalid admin token.');
+        setAuthed(false);
+        return;
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data  = await res.json();
       setDeviceEvents(data.events || []);
-    } catch {} finally { setLoadingDevice(false); }
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load device events.');
+    } finally {
+      setLoadingDevice(false);
+    }
   }, []);
 
   // Auto-load on mount if token already saved
@@ -410,7 +432,7 @@ export default function AdminDashboard() {
   };
 
   const handleExport = async () => {
-    if (!ENDPOINT || !token) return;
+    if (!ENDPOINT_AVAILABLE || !token) return;
     setExporting(true); setError('');
     try {
       const since = Date.now() - sinceMs(range);
@@ -448,7 +470,7 @@ export default function AdminDashboard() {
           Enter the <code>ADMIN_TOKEN</code> secret you set on the Cloudflare Worker.
         </p>
         {error && <div className="error-box">{error}</div>}
-        {!ENDPOINT && <div className="error-box"><strong>VITE_ANALYTICS_URL</strong> is not set.</div>}
+        {!ENDPOINT_AVAILABLE && <div className="error-box"><strong>VITE_ANALYTICS_URL</strong> is not set.</div>}
         <div style={{ display: 'flex', gap: 8 }}>
           <input className="input" type="password" placeholder="Admin token"
             value={tokenDraft} onChange={e => setTokenDraft(e.target.value)}
@@ -472,7 +494,7 @@ export default function AdminDashboard() {
       <div className="admin-header">
         <div>
           <h2 className="admin-title">Analytics Dashboard</h2>
-          <p className="admin-subtitle">FD Macro Generator · internal use only</p>
+          <p className="admin-subtitle">Futures DeskMate · internal use only</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div className="range-picker">
@@ -526,51 +548,87 @@ export default function AdminDashboard() {
             <DailyChart data={stats.daily} range={range} />
           </Section>
 
-          <div className="admin-two-col">
+          {/* Slide 11 layout: 3-column row of Tab Usage / Top Symbols / Recent
+              Errors. The errors table fills the third column when there are
+              errors; otherwise we collapse to a 2-column row. */}
+          <div className="admin-three-col">
             <Section title="Tab Usage">
-              <HBarChart data={stats.tabUsage as NameCount[]} keyField="tab" valueField="count" color="var(--accent)" />
+              <HBarChart
+                data={stats.tabUsage as NameCount[]}
+                keyField="tab"
+                valueField="count"
+                color="var(--accent)"
+                labelMap={TAB_LABELS as Readonly<Record<string, string>>}
+              />
             </Section>
             <Section title="Top Symbols">
               <HBarChart data={stats.topSymbols as NameCount[]} keyField="symbol" valueField="count" color="var(--accent-2)" />
             </Section>
+            {stats.errors.length > 0 ? (
+              <Section title={`Recent Errors (${stats.errors.length})`}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead><tr><th>Time</th><th>Type</th><th>Tab</th><th>Detail</th></tr></thead>
+                    <tbody>
+                      {stats.errors.slice(0, 6).map((e, i) => (
+                        <tr key={i}>
+                          <td className="num" style={{ fontSize: 11, whiteSpace: 'nowrap' }}>
+                            {fmtTime(e.ts).slice(11)}
+                          </td>
+                          <td><span className="evt-badge evt-error">{e.event_type}</span></td>
+                          <td>{e.tab ? (TAB_LABELS[e.tab as Tab] ?? e.tab) : '—'}</td>
+                          <td style={{ fontSize: 11, color: 'var(--text-3)' }}>{propsStr(e.props)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
+            ) : (
+              <Section title="Top Macro Types">
+                <HBarChart data={stats.topMacros as NameCount[]} keyField="macro_type" valueField="count" color="var(--accent)" />
+              </Section>
+            )}
           </div>
 
-          <div className="admin-two-col">
-            <Section title="Top Macro Types">
-              <HBarChart data={stats.topMacros as NameCount[]} keyField="macro_type" valueField="count" color="var(--accent)" />
-            </Section>
+          {/* Lookup modes / Funding / Countries — secondary breakdowns */}
+          <div className="admin-three-col">
             <Section title="Lookup Modes">
               <HBarChart data={stats.lookupModes as NameCount[]} keyField="mode" valueField="count" color="var(--accent-2)" />
             </Section>
-          </div>
-
-          <div className="admin-two-col">
             <Section title="Funding — Top Symbols">
               <HBarChart data={stats.fundingSymbols as NameCount[]} keyField="symbol" valueField="count" color="var(--accent)" />
             </Section>
             <Section title="Countries">
-              <HBarChart data={stats.countries as unknown as NameCount[]} keyField="country" valueField="sessions" color="#a855f7" />
+              <HBarChart data={stats.countries as unknown as NameCount[]} keyField="country" valueField="sessions" color="var(--info)" />
             </Section>
           </div>
 
+          {/* When errors are shown above, also surface Top Macro Types in its
+              own row so it doesn't get hidden. */}
           {stats.errors.length > 0 && (
-            <Section title={`Recent Errors (${stats.errors.length})`}>
-              <div style={{ overflowX: 'auto' }}>
-                <table className="admin-table">
-                  <thead><tr><th>Time (UTC)</th><th>Type</th><th>Tab</th><th>Details</th></tr></thead>
-                  <tbody>
-                    {stats.errors.map((e, i) => (
-                      <tr key={i}>
-                        <td style={{ whiteSpace: 'nowrap' }}>{fmtTime(e.ts)}</td>
-                        <td><span className="evt-badge evt-error">{e.event_type}</span></td>
-                        <td>{e.tab || '—'}</td>
-                        <td style={{ fontSize: 11, color: 'var(--muted)' }}>{propsStr(e.props)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Section>
+            <div className="admin-two-col">
+              <Section title="Top Macro Types">
+                <HBarChart data={stats.topMacros as NameCount[]} keyField="macro_type" valueField="count" color="var(--accent)" />
+              </Section>
+              <Section title="Full error log">
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="admin-table">
+                    <thead><tr><th>Time (UTC)</th><th>Type</th><th>Tab</th><th>Details</th></tr></thead>
+                    <tbody>
+                      {stats.errors.map((e, i) => (
+                        <tr key={i}>
+                          <td style={{ whiteSpace: 'nowrap' }}>{fmtTime(e.ts)}</td>
+                          <td><span className="evt-badge evt-error">{e.event_type}</span></td>
+                          <td>{e.tab ? (TAB_LABELS[e.tab as Tab] ?? e.tab) : '—'}</td>
+                          <td style={{ fontSize: 11, color: 'var(--text-3)' }}>{propsStr(e.props)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Section>
+            </div>
           )}
         </>
       )}

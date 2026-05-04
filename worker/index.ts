@@ -32,8 +32,45 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
     'Access-Control-Allow-Origin':  effectiveOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    // Tell intermediaries / browsers that the response varies by Origin so a
+    // denied preflight can't poison a permitted origin's cached response.
+    'Vary': 'Origin',
+    // Cache successful preflights for 24 h to skip the extra OPTIONS RTT.
+    'Access-Control-Max-Age': '86400',
   };
 }
+
+// Constant-time string comparison so token verification doesn't leak length
+// or prefix via response timing. Worker-fronted endpoints aren't realistically
+// exploitable here (network jitter dominates), but the defense is one line.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+// Allowlist of Binance paths the proxy will forward. Anything outside this
+// list returns 404 — prevents the Worker from being weaponized as an open
+// proxy for arbitrary endpoints (including signed/private ones).
+const FAPI_PATH_ALLOW = [
+  '/fapi/v1/klines',
+  '/fapi/v1/markPriceKlines',
+  '/fapi/v1/aggTrades',
+  '/fapi/v1/premiumIndex',
+  '/fapi/v1/fundingRate',
+  '/fapi/v1/exchangeInfo',
+];
+const SPOT_PATH_ALLOW = [
+  '/api/v3/klines',
+  '/api/v3/aggTrades',
+  '/api/v3/exchangeInfo',
+];
+const SAPI_PATH_ALLOW = [
+  '/sapi/v1/margin/exchange-small-liability',
+  '/sapi/v1/margin/restricted-list',
+  '/sapi/v1/margin/exchange-info',
+];
 
 function json(data: unknown, status = 200, extra: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
@@ -53,9 +90,9 @@ async function hashIp(ip: string): Promise<string> {
 
 function requireAdmin(request: Request, env: Env): boolean {
   const auth = request.headers.get('Authorization');
-  return typeof env.ADMIN_TOKEN === 'string' &&
-    env.ADMIN_TOKEN.length > 0 &&
-    auth === `Bearer ${env.ADMIN_TOKEN}`;
+  if (typeof env.ADMIN_TOKEN !== 'string' || env.ADMIN_TOKEN.length === 0) return false;
+  if (typeof auth !== 'string') return false;
+  return timingSafeEqual(auth, `Bearer ${env.ADMIN_TOKEN}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +118,11 @@ export default {
       const apiKey = env.BINANCE_API_KEY || '';
       if (!apiKey) {
         return json({ error: 'binance_key_not_configured' }, 503, cors);
+      }
+      // Path allowlist: only the SAPI endpoints we actually call. Prevents the
+      // Worker from being weaponized as an open authenticated proxy.
+      if (!SAPI_PATH_ALLOW.includes(url.pathname)) {
+        return json({ error: 'path_not_allowed' }, 403, cors);
       }
 
       const tail = url.pathname + url.search;
@@ -139,6 +181,12 @@ export default {
     // -------------------------------------------------------------------
     if (request.method === 'GET' && (url.pathname.startsWith('/fapi/') || url.pathname.startsWith('/api/'))) {
       const isFapi = url.pathname.startsWith('/fapi/');
+      // Path allowlist enforced per surface. Anything outside is rejected so
+      // the Worker can't proxy arbitrary Binance endpoints.
+      const allow = isFapi ? FAPI_PATH_ALLOW : SPOT_PATH_ALLOW;
+      if (!allow.includes(url.pathname)) {
+        return json({ error: 'path_not_allowed' }, 403, cors);
+      }
       const upstreamBases = isFapi
         ? ['https://fapi.binance.com', 'https://fapi1.binance.com', 'https://fapi2.binance.com', 'https://fapi3.binance.com']
         : ['https://api.binance.com',  'https://api1.binance.com',  'https://api2.binance.com',  'https://api3.binance.com'];
@@ -194,18 +242,68 @@ export default {
     // -------------------------------------------------------------------
     if (request.method === 'POST' && url.pathname === '/track') {
       try {
-        const body = await request.json() as Record<string, unknown>;
+        // Cap body size to 16 KB. The legitimate frontend payload is ~300 bytes;
+        // anything bigger is an abuse attempt or a misuse.
+        const lenHeader = request.headers.get('content-length');
+        if (lenHeader && Number(lenHeader) > 16_384) {
+          return json({ error: 'payload_too_large' }, 413, cors);
+        }
+        const text = await request.text();
+        if (text.length > 16_384) {
+          return json({ error: 'payload_too_large' }, 413, cors);
+        }
+
+        let body: Record<string, unknown>;
+        try {
+          body = JSON.parse(text) as Record<string, unknown>;
+        } catch {
+          return json({ error: 'bad_json' }, 400, cors);
+        }
+        if (!body || typeof body !== 'object') {
+          return json({ error: 'bad_request' }, 400, cors);
+        }
+
+        // Allowlist of event types — anything else is rejected. Keeps the
+        // events table from filling with arbitrary keys an attacker invented.
+        const ALLOWED_EVENTS = new Set<string>([
+          'page_view', 'tab_switch', 'lang_switch',
+          'macro_generated', 'macro_error', 'grid_paste_used',
+          'lookup_query', 'lookup_error', 'trailing_stop_checked', 'gap_explainer_checked',
+          'funding_query', 'funding_error',
+          'average_calc_run',
+          'margin_view', 'margin_refresh', 'margin_error',
+          'error',
+        ]);
+        const eventType = String(body.event || 'unknown').slice(0, 64);
+        if (!ALLOWED_EVENTS.has(eventType)) {
+          return json({ error: 'unknown_event_type' }, 400, cors);
+        }
 
         const ip      = request.headers.get('CF-Connecting-IP') || '';
         const country = (request.headers.get('CF-IPCountry') || 'XX').slice(0, 2).toUpperCase();
         const ipHash  = ip ? await hashIp(ip) : null;
 
-        const eventType = String(body.event  || 'unknown').slice(0, 64);
         const sessionId = String(body.session_id || '').slice(0, 64);
         const deviceId  = String(body.device_id  || '').slice(0, 64);
         const tab       = String(body.tab  || '').slice(0, 32);
-        const props     = JSON.stringify(body.props && typeof body.props === 'object' ? body.props : {});
-        const ts        = typeof body.ts === 'number' ? body.ts : Date.now();
+
+        // Cap props at 32 keys / 4 KB serialized.
+        let propsObj: Record<string, unknown> = {};
+        if (body.props && typeof body.props === 'object' && !Array.isArray(body.props)) {
+          const entries = Object.entries(body.props as Record<string, unknown>).slice(0, 32);
+          for (const [k, v] of entries) {
+            const safeKey = String(k).slice(0, 64);
+            // Only keep primitive values; anything richer is dropped to avoid
+            // unbounded nesting in the JSON blob.
+            if (v === null || ['string', 'number', 'boolean'].includes(typeof v)) {
+              propsObj[safeKey] = typeof v === 'string' ? v.slice(0, 256) : v;
+            }
+          }
+        }
+        let props = JSON.stringify(propsObj);
+        if (props.length > 4096) props = '{}';
+
+        const ts = typeof body.ts === 'number' && Number.isFinite(body.ts) ? body.ts : Date.now();
 
         await env.DB.prepare(`
           INSERT INTO events (event_type, session_id, device_id, ip_hash, country, tab, props, ts)

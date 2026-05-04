@@ -17,21 +17,51 @@ export function upper(s) {
   return (s || "").toString().trim().toUpperCase();
 }
 
-// Build user-friendly status line with timestamp
-export function statusLineFriendly(inputs) {
-  const st = upper(inputs.status);
+/**
+ * Convert a raw trigger-type token into the customer-facing label.
+ * Binance UI conventions: "Mark Price" / "Last Price" (English kept in TR too,
+ * matching the OHLC block style used by buildFullOHLCBlock).
+ *   "MARK" / "mark" / " Mark "  → "Mark Price"
+ *   "LAST" / "last"             → "Last Price"
+ *   anything else (including empty) → returned unchanged so the agent sees
+ *     whatever weird value reached the template instead of a silent default.
+ */
+export function prettyTriggerType(raw, _lang = 'en') {
+  const t = upper(raw);
+  if (t === 'MARK') return 'Mark Price';
+  if (t === 'LAST') return 'Last Price';
+  return raw == null ? '' : String(raw);
+}
 
-  // 'final_status_utc' (Stop-Limit, Not-Reached) önceliklidir.
-  // Yoksa, 'triggered_at_utc' (SL/TP Slippage) kullanılır.
+// Build user-friendly status line with timestamp
+// Optional `lang` param falls back to English to preserve the original
+// behaviour for templates that don't pass it.
+export function statusLineFriendly(inputs, lang = 'en') {
+  const st = upper(inputs.status);
   const t = inputs.final_status_utc || inputs.triggered_at_utc || "";
+
+  if (lang === 'zh') {
+    if (st === "CANCELED" || st === "CANCELLED") return `${t} UTC+0 = 这是订单**被取消**的时间。`;
+    if (st === "EXECUTED") return `${t} UTC+0 = 这是您的订单**成交**的时间。`;
+    if (st === "TRIGGERED") return `${t} UTC+0 = 这是订单**被触发**的时间。`;
+    if (st === "OPEN") return `${t} UTC+0 = 当前状态:**OPEN**(订单仍然有效)。`;
+    if (st === "EXPIRED") return `${t} UTC+0 = 这是订单**过期**的时间。`;
+    return `${t} UTC+0 = 状态:**${st || "N/A"}**。`;
+  }
+  if (lang === 'tr') {
+    if (st === "CANCELED" || st === "CANCELLED") return `${t} UTC+0 = Bu, emrin **iptal edildiği** tarih ve saattir.`;
+    if (st === "EXECUTED") return `${t} UTC+0 = Bu, emrinizin **gerçekleştiği** tarih ve saattir.`;
+    if (st === "TRIGGERED") return `${t} UTC+0 = Bu, emrin **tetiklendiği** tarih ve saattir.`;
+    if (st === "OPEN") return `${t} UTC+0 = Mevcut durum: **OPEN** (emir hala aktif).`;
+    if (st === "EXPIRED") return `${t} UTC+0 = Bu, emrin **süresinin dolduğu** tarih ve saattir.`;
+    return `${t} UTC+0 = Durum: **${st || "N/A"}**.`;
+  }
 
   if (st === "CANCELED" || st === "CANCELLED") {
     return `${t} UTC+0 = This is the date and time the order was **cancelled**.`;
   } else if (st === "EXECUTED") {
     return `${t} UTC+0 = This is the date and time your order **executed**.`;
   } else if (st === "TRIGGERED") {
-    // Bu 'Stop-Limit' için 'Triggered At' ile çakışmayacak,
-    // çünkü 'Stop-Limit' 'final_status_utc' kullanır.
     return `${t} UTC+0 = This is the date and time the order was **triggered**.`;
   } else if (st === "OPEN") {
     return `${t} UTC+0 = Current status: **OPEN** (order still active).`;
@@ -58,17 +88,30 @@ export function truncateToPrecision(raw, prec) {
  * Centralized way to build OHLC block for Mark and Last prices.
  */
 export function buildFullOHLCBlock(prices, lang = 'en', precision = 8) {
-  const isTr = lang === 'tr';
   const mark = prices?.mark;
   const last = prices?.last;
 
-  if (isTr) {
+  if (lang === 'zh') {
+    return `> **Mark Price(1分钟 K 线):**
+>   开盘: ${fmtNum(mark?.open, precision)}
+>   最高: ${fmtNum(mark?.high, precision)}
+>   最低: ${fmtNum(mark?.low, precision)}
+>   收盘: ${fmtNum(mark?.close, precision)}
+
+> **Last Price(1分钟 K 线):**
+>   开盘: ${fmtNum(last?.open, precision)}
+>   最高: ${fmtNum(last?.high, precision)}
+>   最低: ${fmtNum(last?.low, precision)}
+>   收盘: ${fmtNum(last?.close, precision)}`;
+  }
+
+  if (lang === 'tr') {
     return `> **Mark Price (1dk Mum):**
 >   Açılış: ${fmtNum(mark?.open, precision)}
 >   Yüksek: ${fmtNum(mark?.high, precision)}
 >   Düşük:  ${fmtNum(mark?.low, precision)}
 >   Kapanış: ${fmtNum(mark?.close, precision)}
-> 
+
 > **Last Price (1dk Mum):**
 >   Açılış: ${fmtNum(last?.open, precision)}
 >   Yüksek: ${fmtNum(last?.high, precision)}
@@ -81,7 +124,7 @@ export function buildFullOHLCBlock(prices, lang = 'en', precision = 8) {
 >   High: ${fmtNum(mark?.high, precision)}
 >   Low:  ${fmtNum(mark?.low, precision)}
 >   Close: ${fmtNum(mark?.close, precision)}
-> 
+
 > **Last Price (1m Candle):**
 >   Open: ${fmtNum(last?.open, precision)}
 >   High: ${fmtNum(last?.high, precision)}
@@ -93,10 +136,17 @@ export function buildFullOHLCBlock(prices, lang = 'en', precision = 8) {
  * Centralized way to build OHLC block ONLY for Last price.
  */
 export function buildLastPriceOHLCBlock(prices, lang = 'en', precision = 8) {
-  const isTr = lang === 'tr';
   const last = prices?.last;
 
-  if (isTr) {
+  if (lang === 'zh') {
+    return `> **Last Price(1分钟 K 线):**
+>   开盘: ${fmtNum(last?.open, precision)}
+>   最高: ${fmtNum(last?.high, precision)}
+>   最低: ${fmtNum(last?.low, precision)}
+>   收盘: ${fmtNum(last?.close, precision)}`;
+  }
+
+  if (lang === 'tr') {
     return `> **Last Price (1dk Mum):**
 >   Açılış: ${fmtNum(last?.open, precision)}
 >   Yüksek: ${fmtNum(last?.high, precision)}
@@ -149,27 +199,34 @@ export async function generateMacro(params: any) {
 export function applyTone(text, tone, lang = 'en') {
   if (!tone || tone === 'standard') return text;
 
-  const isTr = lang === 'tr';
   let prefix = "";
   let suffix = "";
 
   switch (tone) {
     case 'professional':
-      prefix = isTr
-        ? "Sayın Kullanıcımız,\n\nİlettiğiniz durum incelenmiştir. Teknik detaylar aşağıdadır:\n"
-        : "Dear User,\n\nWe have reviewed your inquiry. Please find the technical details below:\n";
-      suffix = isTr
-        ? "\n\nSaygılarımızla,\nBinance Destek Ekibi"
-        : "\n\nBest Regards,\nBinance Support Team";
+      if (lang === 'zh') {
+        prefix = "尊敬的用户,\n\n您反馈的情况已经核实。技术细节如下:\n";
+        suffix = "\n\n此致,\n币安客服团队";
+      } else if (lang === 'tr') {
+        prefix = "Sayın Kullanıcımız,\n\nİlettiğiniz durum incelenmiştir. Teknik detaylar aşağıdadır:\n";
+        suffix = "\n\nSaygılarımızla,\nBinance Destek Ekibi";
+      } else {
+        prefix = "Dear User,\n\nWe have reviewed your inquiry. Please find the technical details below:\n";
+        suffix = "\n\nBest Regards,\nBinance Support Team";
+      }
       break;
 
     case 'empathetic':
-      prefix = isTr
-        ? "Merhaba,\n\nYaşadığınız durumun kafa karıştırıcı olabileceğini anlıyorum. Sizin için kontrolleri sağladım.\n"
-        : "Hello,\n\nI understand this situation might be confusing. I have checked the details for you.\n";
-      suffix = isTr
-        ? "\n\nUmarım bu açıklama endişenizi gidermiştir. Her zaman yanınızdayız. 🙏"
-        : "\n\nI hope this explanation helps put your mind at ease. We are here for you. 🙏";
+      if (lang === 'zh') {
+        prefix = "您好,\n\n我能理解这种情况可能让您感到困惑。我已经为您仔细核实了相关数据。\n";
+        suffix = "\n\n希望以上说明能让您安心。如有需要,我们随时为您提供帮助。🙏";
+      } else if (lang === 'tr') {
+        prefix = "Merhaba,\n\nYaşadığınız durumun kafa karıştırıcı olabileceğini anlıyorum. Sizin için kontrolleri sağladım.\n";
+        suffix = "\n\nUmarım bu açıklama endişenizi gidermiştir. Her zaman yanınızdayız. 🙏";
+      } else {
+        prefix = "Hello,\n\nI understand this situation might be confusing. I have checked the details for you.\n";
+        suffix = "\n\nI hope this explanation helps put your mind at ease. We are here for you. 🙏";
+      }
       break;
 
     case 'direct':

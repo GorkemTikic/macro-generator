@@ -196,6 +196,8 @@ function parseDataMap(dataMap: { [key: string]: string }): Partial<MacroInputs> 
 
 export default function MacroGenerator({ lang, uiStrings }) {
   const t = uiStrings;
+  const L = (en: string, tr: string, zh?: string) =>
+    lang === 'tr' ? tr : lang === 'zh' ? (zh ?? en) : en;
   const { activeSymbol, setActiveSymbol } = useApp();
 
   const [macros, setMacros] = useState<any[]>([]);
@@ -217,27 +219,21 @@ export default function MacroGenerator({ lang, uiStrings }) {
   const [pasteData, setPasteData] = useState("");
   const [parseError, setParseError] = useState("");
 
-  // Password Protection State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  const requireAuth = (callback: Function) => {
-    if (isAuthenticated) {
-      callback();
-      return;
-    }
-    const pwd = window.prompt(lang === 'tr' ? "Bu aracı kullanmak için lütfen şifreyi giriniz:" : "Please enter the password to use this tool:");
-    if (pwd === "112233") {
-      setIsAuthenticated(true);
-      callback();
-    } else if (pwd !== null) {
-      alert(lang === 'tr' ? "Hatalı şifre!" : "Incorrect password!");
-    }
-  };
+  // Toast for "Copied" feedback (replaces blocking alert())
+  const [toastMsg, setToastMsg] = useState("");
 
   // Sync Active Symbol -> Inputs
   useEffect(() => {
     setInputs(prev => ({ ...prev, symbol: activeSymbol }));
   }, [activeSymbol]);
+
+  // Esc-to-close on the parse modal (a11y).
+  useEffect(() => {
+    if (!showParseModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setShowParseModal(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showParseModal]);
 
   // Smart Detect Logic
   useEffect(() => {
@@ -294,18 +290,30 @@ export default function MacroGenerator({ lang, uiStrings }) {
 
   const onChange = (k: string, v: string) => setInputs((prev) => ({ ...prev, [k]: v }));
 
-  // Preview Data Map for Modal
-  const previewDataMap = useMemo(() => {
+  // Preview Data Map for Modal — pure compute (no setState in useMemo).
+  const previewDataMap = useMemo<{ [key: string]: string } | { __error: string }>(() => {
     try {
-      setParseError("");
       return mapGridData(pasteData);
     } catch (e: any) {
-      if (pasteData.trim().length > 0) {
-        setParseError(e.message);
-      }
-      return {};
+      return { __error: e.message };
     }
   }, [pasteData]);
+
+  // Mirror parse errors into state via effect (the side effect that used to
+  // live inside useMemo).
+  useEffect(() => {
+    if ("__error" in previewDataMap && pasteData.trim().length > 0) {
+      setParseError(previewDataMap.__error);
+    } else {
+      setParseError("");
+    }
+  }, [previewDataMap, pasteData]);
+
+  // Convenience: data map without the error sentinel.
+  const previewDataMapClean: { [key: string]: string } = useMemo(
+    () => ("__error" in previewDataMap ? {} : previewDataMap),
+    [previewDataMap]
+  );
 
   function openParseModal() {
     setPasteData("");
@@ -316,7 +324,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
   function handleParseAndFill() {
     setParseError("");
     try {
-      const dataMap = previewDataMap;
+      const dataMap = previewDataMapClean;
       if (Object.keys(dataMap).length < 27) {
         throw new Error("Lütfen veriyi yapıştırın.");
       }
@@ -420,7 +428,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
         const precisions = await getAllSymbolPrecisions();
         prices.precision = precisions[effectiveInputs.symbol.toUpperCase()] ?? 8;
       } catch (precErr) {
-        console.warn("Failed to fetch precision, using default 8", precErr);
+        if (import.meta.env?.DEV) console.warn("Failed to fetch precision, using default 8", precErr);
         prices.precision = 8;
       }
 
@@ -458,8 +466,14 @@ export default function MacroGenerator({ lang, uiStrings }) {
 
   async function handleCopy() {
     if (!result) return;
-    await navigator.clipboard.writeText(result);
-    alert(t.copied || "Copied!");
+    try {
+      await navigator.clipboard.writeText(result);
+      setToastMsg(t.copied || "Copied!");
+      setTimeout(() => setToastMsg(""), 2000);
+    } catch {
+      setToastMsg(L("Copy failed", "Kopyalanamadı", "复制失败"));
+      setTimeout(() => setToastMsg(""), 2000);
+    }
   }
 
   // --- Render Helpers ---
@@ -481,8 +495,16 @@ export default function MacroGenerator({ lang, uiStrings }) {
         isDisabled = true;
       }
       helperText = (inputs.status === "OPEN")
-        ? (lang === 'tr' ? "'AÇIK' emirler için 'Verilme Zamanı'ndan şu anki zamana kadar kontrol edilir." : "For 'OPEN' orders, we check from 'Placed At' to the current time.")
-        : (lang === 'tr' ? `Emrin ${inputs.status.toLowerCase()} olduğu zamanı girin.` : `Enter the time the order was ${inputs.status.toLowerCase()}.`);
+        ? L(
+            "For 'OPEN' orders, we check from 'Placed At' to the current time.",
+            "'AÇIK' emirler için 'Verilme Zamanı'ndan şu anki zamana kadar kontrol edilir.",
+            "对于 OPEN 订单,我们会从「下单时间」检查到当前时间。"
+          )
+        : L(
+            `Enter the time the order was ${inputs.status.toLowerCase()}.`,
+            `Emrin ${inputs.status.toLowerCase()} olduğu zamanı girin.`,
+            `请输入订单 ${inputs.status.toLowerCase()} 的时间。`
+          );
     }
 
     if (field.type === "select") {
@@ -561,7 +583,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
                 style={{ opacity: keysToShow.includes(key) || key === "Liquidation" ? 1 : 0.4 }}
               >
                 <td>{key}</td>
-                <td>{previewDataMap[key] || ""}</td>
+                <td>{previewDataMapClean[key] || ""}</td>
               </tr>
             ))}
           </tbody>
@@ -572,9 +594,14 @@ export default function MacroGenerator({ lang, uiStrings }) {
 
   return (
     <div className="panel">
+      {toastMsg && (
+        <div role="status" aria-live="polite" className="mg-toast">
+          {toastMsg}
+        </div>
+      )}
       {/* Grid Parse Modal */}
       {showParseModal && (
-        <div className="modal-overlay" onClick={() => setShowParseModal(false)}>
+        <div className="modal-overlay" onClick={() => setShowParseModal(false)} role="dialog" aria-modal="true" aria-label={t.pasteModalTitle}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <button className="modal-close-btn" onClick={() => setShowParseModal(false)}>×</button>
             <h3>{t.pasteModalTitle}</h3>
@@ -609,7 +636,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
 
       {/* Main Form */}
       <div className="col-12" style={{ marginBottom: 16 }}>
-        <button className="btn secondary" onClick={() => requireAuth(openParseModal)}>
+        <button className="btn secondary" onClick={openParseModal}>
           {t.pasteButtonLabel}
         </button>
       </div>
@@ -619,12 +646,16 @@ export default function MacroGenerator({ lang, uiStrings }) {
         {/* Smart Detect Input */}
         <div className="col-12" style={{ marginBottom: 12 }}>
           <label className="label" style={{ color: '#8b5cf6' }}>
-            {lang === 'tr' ? "🔍 Akıllı Tespit / Smart Detect" : "🔍 Smart Detect (Describe Issue)"}
+            {L("🔍 Smart Detect (Describe Issue)", "🔍 Akıllı Tespit / Smart Detect", "🔍 智能识别(描述问题)")}
           </label>
           <textarea
             className="input"
             rows={2}
-            placeholder={lang === 'tr' ? "Müşteri ne diyor? (Örn: 'Stopum çalışmadı', 'Fiyat kaydı')..." : "Paste customer complaint here (e.g., 'Stop didn't trigger')..."}
+            placeholder={L(
+              "Paste customer complaint here (e.g., 'Stop didn't trigger')...",
+              "Müşteri ne diyor? (Örn: 'Stopum çalışmadı', 'Fiyat kaydı')...",
+              "粘贴客户的描述(例如:「我的止损没触发」)..."
+            )}
             value={userQuery}
             onChange={(e) => setUserQuery(e.target.value)}
             style={{
@@ -668,16 +699,16 @@ export default function MacroGenerator({ lang, uiStrings }) {
             </select>
           </div>
           <div style={{ flex: 1 }}>
-            <label className="label">{lang === 'tr' ? "Üslup / Ton" : "Tone"}</label>
+            <label className="label">{L("Tone", "Üslup / Ton", "语气 / 语调")}</label>
             <select
               className="select"
               value={tone}
               onChange={(e) => setTone(e.target.value)}
             >
-              <option value="standard">{lang === 'tr' ? "Standart (Eğitici)" : "Standard (Educational)"}</option>
-              <option value="professional">{lang === 'tr' ? "Kurumsal (Resmi)" : "Professional (Formal)"}</option>
-              <option value="empathetic">{lang === 'tr' ? "Empatik (Nazik)" : "Empathetic (Soft)"}</option>
-              <option value="direct">{lang === 'tr' ? "Net (Kısa)" : "Direct (Concise)"}</option>
+              <option value="standard">{L("Standard (Educational)", "Standart (Eğitici)", "标准(教学型)")}</option>
+              <option value="professional">{L("Professional (Formal)", "Kurumsal (Resmi)", "专业(正式)")}</option>
+              <option value="empathetic">{L("Empathetic (Soft)", "Empatik (Nazik)", "共情(柔和)")}</option>
+              <option value="direct">{L("Direct (Concise)", "Net (Kısa)", "直接(简洁)")}</option>
             </select>
           </div>
         </div>
@@ -688,7 +719,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
           <button
             className="btn"
             id="generate-btn"
-            onClick={() => requireAuth(handleGenerate)}
+            onClick={() => handleGenerate()}
             disabled={loading}
           >
             {loading ? t.generating : t.generate}
@@ -699,7 +730,7 @@ export default function MacroGenerator({ lang, uiStrings }) {
           <button
             className="btn secondary"
             id="copy-btn"
-            onClick={() => requireAuth(handleCopy)}
+            onClick={() => handleCopy()}
             disabled={!result}
           >
             {t.copy}
@@ -721,7 +752,11 @@ export default function MacroGenerator({ lang, uiStrings }) {
       <div ref={outRef} className="grid" style={{ marginTop: 10 }}>
         <div className="col-12">
           <label className="label">{t.resultLabel}</label>
-          <textarea className="textarea" rows={14} value={result} readOnly />
+          {result ? (
+            <div className="copy-block" data-testid="macro-output">{result}</div>
+          ) : (
+            <textarea className="textarea" rows={14} value="" readOnly placeholder="" />
+          )}
         </div>
       </div>
     </div>

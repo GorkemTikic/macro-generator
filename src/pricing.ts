@@ -1,10 +1,33 @@
 // src/pricing.js
 
-// Production CORS proxy — the analytics Worker also exposes
-// /fapi/* and /api/* routes that forward to Binance with server-side
-// multi-base fallback. Empty string disables the proxy (useful for
-// local dev when Vite's /api-binance proxy is in use).
-export const PROXY = (import.meta as any).env?.VITE_BINANCE_PROXY ?? "https://macro-analytics.grkmtkc94.workers.dev";
+// CORS proxy for Binance API calls.
+//
+// Production: VITE_BINANCE_PROXY is unset, so we default to the deployed Worker,
+// which has its own ALLOWED_ORIGIN allowlist + server-side multi-base fallback.
+//
+// Local dev: the Worker rejects http://localhost:5173 with
+// `Access-Control-Allow-Origin: null`, so requests CORS-fail in the browser.
+// We default to empty string in dev mode, which makes URL construction below
+// produce relative paths (e.g. `/fapi/v1/klines?...`) that Vite's dev server
+// proxies straight to Binance — no CORS problem because the browser sees a
+// same-origin response. See vite.config.ts for the proxy table.
+//
+// Explicit empty string from .env.local also forces the relative-path mode
+// (in either dev or prod), in case someone wants to host their own proxy.
+// `import.meta.env` is injected by Vite at bundle time. The `test:trailing`
+// CLI script imports this module under plain Node via tsx, where import.meta
+// has no `env`, so we read through a single any-cast at this boundary. Inside
+// the bundle the values are still typed via `src/vite-env.d.ts`.
+const _ENV = ((import.meta as unknown as { env?: ImportMetaEnv }).env) ?? ({} as ImportMetaEnv);
+const _RAW_PROXY = _ENV.VITE_BINANCE_PROXY;
+const _DEFAULT_PROXY = _ENV.DEV ? "" : "https://macro-analytics.grkmtkc94.workers.dev";
+export const PROXY = (_RAW_PROXY ?? _DEFAULT_PROXY).trim().replace(/\/$/, "");
+// PROXY is always set (deployed worker URL in prod, "" for the dev relative-path
+// mode, or whatever the user configured via env). The "iterate F_BASES/S_BASES
+// directly" fallback below is dead — Binance rejects browser requests with
+// CORS, so any attempt to bypass the proxy fails in practice. We keep the loop
+// scaffolding for shape but always feed it a single target.
+const _PROXY_CONFIGURED = true;
 
 // Alternative Binance API Base URLs for fallback
 const F_BASES = [
@@ -63,24 +86,27 @@ function fmtFreq(ms) {
  */
 async function fetchWithFallback(bases, path, kind = "") {
   let lastError = null;
-  // When PROXY is set, all bases collapse into one Worker URL. The Worker
-  // performs its own multi-base fallback server-side, so we only call once.
-  const targets = PROXY ? [PROXY] : bases;
+  // When the proxy is configured (Worker URL, custom URL, or empty=relative for
+  // dev), all bases collapse into one URL. The Worker performs its own
+  // multi-base fallback server-side; the dev proxy talks to a single Binance
+  // host. Only the legacy "no proxy" branch iterates bases for direct calls.
+  const targets = _PROXY_CONFIGURED ? [PROXY] : bases;
   for (const base of targets) {
     try {
-      const url = PROXY ? `${PROXY}${path}` : `${base}${path}`;
+      const url = _PROXY_CONFIGURED ? `${PROXY}${path}` : `${base}${path}`;
       const res = await fetch(url);
       if (res.ok) return await res.json();
 
       if (res.status === 429) throw new Error("Binance Rate Limit (429). Please wait a moment.");
-      if (res.status === 418) throw new Error("IP Banned (418). Please use a VPN or Proxy.");
-      if (res.status === 451) throw new Error("Regional Block (451). This API is restricted in your region. Use a Proxy.");
+      if (res.status === 418) throw new Error("Binance proxy temporarily blocked (418). The shared proxy IP got rate-limited. Try again in a few minutes.");
+      if (res.status === 451) throw new Error("Regional Block (451). This API is restricted in your region.");
+      if (res.status >= 500) throw new Error(`Binance temporarily unavailable (HTTP ${res.status}). Please retry in a moment.`);
 
       lastError = new Error(`HTTP Error ${res.status}: ${res.statusText}`);
     } catch (err) {
       lastError = err;
       // Continue to next base if it's a network error or transient failure
-      if (err.message.includes("Rate Limit") || err.message.includes("IP Banned") || err.message.includes("Regional Block")) {
+      if (err.message.includes("Rate Limit") || err.message.includes("proxy temporarily blocked") || err.message.includes("Regional Block")) {
         throw err; // Stop if it's a hard limit
       }
     }
@@ -127,6 +153,21 @@ async function fetchAllKlines(kind, symbol, startMs, endMs, market = "futures", 
 }
 
 /**
+ * Find the index of the max/min value in a numeric array without spreading it
+ * into Math.max/Math.min — those throw RangeError on ~125k+ items.
+ */
+function argMax(arr: number[]): { value: number; index: number } {
+  let v = -Infinity, i = -1;
+  for (let k = 0; k < arr.length; k++) { if (arr[k] > v) { v = arr[k]; i = k; } }
+  return { value: v, index: i };
+}
+function argMin(arr: number[]): { value: number; index: number } {
+  let v = Infinity, i = -1;
+  for (let k = 0; k < arr.length; k++) { if (arr[k] < v) { v = arr[k]; i = k; } }
+  return { value: v, index: i };
+}
+
+/**
  * Tek bir dakikanın hem Mark hem de Last Price 1m mumunu çek
  * @param {string} symbol
  * @param {string} triggeredAtStr YYYY-MM-DD HH:MM:SS
@@ -134,7 +175,10 @@ async function fetchAllKlines(kind, symbol, startMs, endMs, market = "futures", 
  */
 export async function getTriggerMinuteCandles(symbol, triggeredAtStr, market = "futures") {
   const start = msMinuteStartUTC(triggeredAtStr);
-  const end = start + 60 * 1000;
+  // Binance treats `endTime` inclusively, so subtract 1 ms to get exactly one
+  // candle. Without this, requests can return both the trigger minute and the
+  // following minute, and downstream code only reads `[0]`, hiding the bug.
+  const end = start + 60 * 1000 - 1;
 
   const parseCandle = (c) =>
     !c
@@ -193,12 +237,12 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
     if (lastCandles.length) {
       const highs = lastCandles.map((c) => parseFloat(c[2]));
       const lows = lastCandles.map((c) => parseFloat(c[3]));
-      lastHigh = Math.max(...highs);
-      lastLow = Math.min(...lows);
-      const idxH = highs.indexOf(lastHigh);
-      const idxL = lows.indexOf(lastLow);
-      lastHighTime = fmtUTC(Number(lastCandles[idxH][0]));
-      lastLowTime = fmtUTC(Number(lastCandles[idxL][0]));
+      const h = argMax(highs);
+      const l = argMin(lows);
+      lastHigh = h.value;
+      lastLow = l.value;
+      lastHighTime = fmtUTC(Number(lastCandles[h.index][0]));
+      lastLowTime = fmtUTC(Number(lastCandles[l.index][0]));
       lastOpen = parseFloat(lastCandles[0][1]);
       lastClose = parseFloat(lastCandles[lastCandles.length - 1][4]);
     }
@@ -237,12 +281,12 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
   if (markCandles.length) {
     const highs = markCandles.map((c) => parseFloat(c[2]));
     const lows = markCandles.map((c) => parseFloat(c[3]));
-    markHigh = Math.max(...highs);
-    markLow = Math.min(...lows);
-    const idxH = highs.indexOf(markHigh);
-    const idxL = lows.indexOf(markLow);
-    markHighTime = fmtUTC(Number(markCandles[idxH][0]));
-    markLowTime = fmtUTC(Number(markCandles[idxL][0]));
+    const h = argMax(highs);
+    const l = argMin(lows);
+    markHigh = h.value;
+    markLow = l.value;
+    markHighTime = fmtUTC(Number(markCandles[h.index][0]));
+    markLowTime = fmtUTC(Number(markCandles[l.index][0]));
     markOpen = parseFloat(markCandles[0][1]);
     markClose = parseFloat(markCandles[markCandles.length - 1][4]);
   }
@@ -251,12 +295,12 @@ export async function getRangeHighLow(symbol, fromStr, toStr, market = "futures"
   if (lastCandles.length) {
     const highs = lastCandles.map((c) => parseFloat(c[2]));
     const lows = lastCandles.map((c) => parseFloat(c[3]));
-    lastHigh = Math.max(...highs);
-    lastLow = Math.min(...lows);
-    const idxH = highs.indexOf(lastHigh);
-    const idxL = lows.indexOf(lastLow);
-    lastHighTime = fmtUTC(Number(lastCandles[idxH][0]));
-    lastLowTime = fmtUTC(Number(lastCandles[idxL][0]));
+    const h = argMax(highs);
+    const l = argMin(lows);
+    lastHigh = h.value;
+    lastLow = l.value;
+    lastHighTime = fmtUTC(Number(lastCandles[h.index][0]));
+    lastLowTime = fmtUTC(Number(lastCandles[l.index][0]));
     lastOpen = parseFloat(lastCandles[0][1]);
     lastClose = parseFloat(lastCandles[lastCandles.length - 1][4]);
   }
@@ -309,13 +353,13 @@ export async function getLastPriceAtSecond(symbol, atStr, market = "futures") {
     : `/api/v3/aggTrades?symbol=${symbol}&startTime=${start}&endTime=${end}&limit=1000`;
 
   const trades = await fetchWithFallback(bases, path, "aggTrades");
-  if (!trades.length) return null;
+  if (!Array.isArray(trades) || !trades.length) return null;
 
   const prices = trades.map((t) => parseFloat(t.p));
   return {
     open: prices[0],
-    high: Math.max(...prices),
-    low: Math.min(...prices),
+    high: argMax(prices).value,
+    low: argMin(prices).value,
     close: prices[prices.length - 1],
     count: trades.length,
   };

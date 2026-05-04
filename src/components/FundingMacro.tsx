@@ -14,6 +14,8 @@ import { fmtNum } from "../macros/helpers";
 
 // ✅ GÜNCELLENDİ: Propları alır
 export default function FundingMacro({ lang, uiStrings }) {
+  const L = (en: string, tr: string, zh?: string) =>
+    lang === 'tr' ? tr : lang === 'zh' ? (zh ?? en) : en;
   const [symbol, setSymbol] = useState("BTCUSDT");
   const [fundingTime, setFundingTime] = useState("");
   const [positionSize, setPositionSize] = useState("");
@@ -27,6 +29,7 @@ export default function FundingMacro({ lang, uiStrings }) {
 
   const [rawMarkPrice, setRawMarkPrice] = useState<any>(null);
   const [lastInputs, setLastInputs] = useState<any>(null);
+  const [toastMsg, setToastMsg] = useState("");
 
   const t = uiStrings; // Çeviri metinleri
 
@@ -35,12 +38,12 @@ export default function FundingMacro({ lang, uiStrings }) {
     setResult("");
     setLoading(true);
 
-    const errSym = lang === 'tr' ? 'Sembol gerekli.' : 'Symbol is required.';
-    const errTime = lang === 'tr' ? 'Funding Zamanı gerekli.' : 'Funding Time is required.';
-    const errSize = lang === 'tr' ? 'Pozisyon Büyüklüğü gerekli.' : 'Position Size is required.';
-    const errInt = lang === 'tr' ? 'Funding Aralığı (saat) gerekli.' : 'Funding Interval (hours) is required.';
-    const errRec = lang === 'tr' ? 'Bu zamana yakın bir funding kaydı bulunamadı.' : 'No funding record found near that time.';
-    const errMark = lang === 'tr' ? 'Mark price (1m) alınamadı' : 'Could not fetch mark price from 1m candles';
+    const errSym = L('Symbol is required.', 'Sembol gerekli.', '请输入交易对。');
+    const errTime = L('Funding Time is required.', 'Funding Zamanı gerekli.', '请输入资金费时间。');
+    const errSize = L('Position Size is required.', 'Pozisyon Büyüklüğü gerekli.', '请输入仓位大小。');
+    const errInt = L('Funding Interval (hours) is required.', 'Funding Aralığı (saat) gerekli.', '请输入资金费周期(小时)。');
+    const errRec = L('No funding record found near that time.', 'Bu zamana yakın bir funding kaydı bulunamadı.', '在该时间附近未找到资金费记录。');
+    const errMark = L('Could not fetch mark price from 1m candles', 'Mark price (1m) alınamadı', '无法从 1 分钟 K 线获取 Mark Price');
 
 
     try {
@@ -48,6 +51,20 @@ export default function FundingMacro({ lang, uiStrings }) {
       if (!fundingTime) throw new Error(errTime);
       if (!positionSize) throw new Error(errSize);
       if (!fundingInterval) throw new Error(errInt);
+
+      // Funding-fee math here is the linear (USDⓈ-M) formula `notional = size *
+      // mark`. Coin-margined contracts (BTCUSD_PERP, BTCUSD_240329…) are
+      // inverse and would produce wrong numbers. Block early with a clear
+      // message rather than silently emitting a misleading macro.
+      const upSym = symbol.toUpperCase();
+      const looksCoinM = /(_PERP|_\d{6})$/.test(upSym) || /USD$/.test(upSym);
+      if (looksCoinM) {
+        throw new Error(L(
+          `${upSym} looks like a coin-margined contract. This tool only computes funding correctly for USDⓈ-M (linear) symbols. Coin-M needs the inverse formula — calculate manually.`,
+          `${upSym} bir coin-margined sözleşme gibi görünüyor. Bu araç yalnızca USDⓈ-M (linear) sözleşmeleri için doğru sonuç verir. Coin-margined için manuel hesaplama yapın.`,
+          `${upSym} 看起来是一个 coin-margined(币本位)合约。此工具仅适用于 USDⓈ-M(线性)合约。Coin-M 使用反向公式,请手动计算。`
+        ));
+      }
 
       const rec = await getNearestFunding(symbol, fundingTime);
       if (!rec) throw new Error(errRec);
@@ -121,13 +138,23 @@ export default function FundingMacro({ lang, uiStrings }) {
 
   async function handleCopy() {
     if (!result) return;
-    await navigator.clipboard.writeText(result);
-    // UI feedback handled in parent usually, keeping simple alert for consistency with MacroGenerator
-    alert(t.copied || "Copied!");
+    try {
+      await navigator.clipboard.writeText(result);
+      setToastMsg(t.copied || "Copied!");
+      setTimeout(() => setToastMsg(""), 2000);
+    } catch {
+      setToastMsg(L("Copy failed", "Kopyalanamadı", "复制失败"));
+      setTimeout(() => setToastMsg(""), 2000);
+    }
   }
 
   return (
     <div className="panel">
+      {toastMsg && (
+        <div role="status" aria-live="polite" className="mg-toast">
+          {toastMsg}
+        </div>
+      )}
       <h3>{t.fundingTitle}</h3>
       <div className="grid">
         <div className="col-6">
@@ -195,16 +222,16 @@ export default function FundingMacro({ lang, uiStrings }) {
             </select>
           </div>
           <div style={{ flex: 1 }}>
-            <label className="label">{lang === 'tr' ? "Üslup / Ton" : "Tone"}</label>
+            <label className="label">{L("Tone", "Üslup / Ton", "语气 / 语调")}</label>
             <select
               className="select"
               value={tone}
               onChange={(e) => setTone(e.target.value)}
             >
-              <option value="standard">{lang === 'tr' ? "Standart (Eğitici)" : "Standard (Educational)"}</option>
-              <option value="professional">{lang === 'tr' ? "Kurumsal (Resmi)" : "Professional (Formal)"}</option>
-              <option value="empathetic">{lang === 'tr' ? "Empatik (Nazik)" : "Empathetic (Soft)"}</option>
-              <option value="direct">{lang === 'tr' ? "Net (Kısa)" : "Direct (Concise)"}</option>
+              <option value="standard">{L("Standard (Educational)", "Standart (Eğitici)", "标准(教学型)")}</option>
+              <option value="professional">{L("Professional (Formal)", "Kurumsal (Resmi)", "专业(正式)")}</option>
+              <option value="empathetic">{L("Empathetic (Soft)", "Empatik (Nazik)", "共情(柔和)")}</option>
+              <option value="direct">{L("Direct (Concise)", "Net (Kısa)", "直接(简洁)")}</option>
             </select>
           </div>
         </div>
@@ -245,7 +272,7 @@ export default function FundingMacro({ lang, uiStrings }) {
       {result && (
         <div style={{ marginTop: 16 }}>
           <label className="label">{t.resultLabel}</label>
-          <textarea className="textarea" rows={14} value={result} readOnly />
+          <div className="copy-block">{result}</div>
         </div>
       )}
     </div>

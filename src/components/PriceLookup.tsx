@@ -14,6 +14,9 @@ import { useApp } from "../context/AppContext";
 import { track } from "../analytics";
 
 export default function PriceLookup({ lang, uiStrings }) {
+  // 3-way locale picker. Falls back to EN if zh is undefined for a given key.
+  const L = (en: string, tr: string, zh?: string) =>
+    lang === 'tr' ? tr : lang === 'zh' ? (zh ?? en) : en;
   const { activeSymbol, setActiveSymbol } = useApp();
   const [market, setMarket] = useState("futures"); // "futures" | "spot"
   const [mode, setMode] = useState("trigger"); // "trigger" | "range" | "last1s" | "findPrice"
@@ -29,6 +32,7 @@ export default function PriceLookup({ lang, uiStrings }) {
   const [result, setResult] = useState("");
   const [trailingResult, setTrailingResult] = useState<any>(null);
   const [error, setError] = useState("");
+  const [toastMsg, setToastMsg] = useState("");
 
   const t = uiStrings; // Çeviri metinleri
 
@@ -54,8 +58,14 @@ export default function PriceLookup({ lang, uiStrings }) {
 
   async function copyText(text) {
     if (!text) return;
-    await navigator.clipboard.writeText(text);
-    alert(t.copied || "Copied!");
+    try {
+      await navigator.clipboard.writeText(text);
+      setToastMsg(t.copied || "Copied!");
+      setTimeout(() => setToastMsg(""), 2000);
+    } catch {
+      setToastMsg(L("Copy failed", "Kopyalanamadı", "复制失败"));
+      setTimeout(() => setToastMsg(""), 2000);
+    }
   }
 
   function buildTrailingOutput(data, params) {
@@ -190,11 +200,11 @@ export default function PriceLookup({ lang, uiStrings }) {
     setResult("");
     setTrailingResult(null);
     setError("");
-    const errTime = lang === 'tr' ? 'Lütfen bir "Tetiklenme Zamanı" girin.' : 'Please enter a Triggered At timestamp.';
-    const errRange = lang === 'tr' ? 'Lütfen Başlangıç ve Bitiş zamanlarını girin.' : 'Please enter both From and To.';
-    const errPrice = lang === 'tr' ? 'Lütfen bir hedef Fiyat girin.' : 'Please enter a target Price.';
-    const errLast1s = lang === 'tr' ? 'Lütfen bir Tarih/Zaman (UTC) girin.' : 'Please enter a DateTime (UTC).';
-    const errCallback = lang === 'tr' ? 'Lütfen Geri Dönüş Oranı girin.' : 'Please enter Callback Rate.';
+    const errTime = L('Please enter a Triggered At timestamp.', 'Lütfen bir "Tetiklenme Zamanı" girin.', '请输入触发时间。');
+    const errRange = L('Please enter both From and To.', 'Lütfen Başlangıç ve Bitiş zamanlarını girin.', '请输入起始时间和结束时间。');
+    const errPrice = L('Please enter a target Price.', 'Lütfen bir hedef Fiyat girin.', '请输入目标价。');
+    const errLast1s = L('Please enter a DateTime (UTC).', 'Lütfen bir Tarih/Zaman (UTC) girin.', '请输入时间 (UTC)。');
+    const errCallback = L('Please enter Callback Rate.', 'Lütfen Geri Dönüş Oranı girin.', '请输入回调率。');
 
     try {
       if (mode === "trigger") {
@@ -205,21 +215,21 @@ export default function PriceLookup({ lang, uiStrings }) {
 
         let msg = `### 🕒 ${at} UTC+0\n` +
           `**Symbol:** ${activeSymbol} | **Market:** ${market.toUpperCase()}\n\n` +
-          (lang === 'tr' ? `#### Fiyat Verileri:` : `#### Price Data:`) + `\n\n`;
+          L(`#### Price Data:`, `#### Fiyat Verileri:`, `#### 价格数据:`) + `\n\n`;
 
         if (market === "futures") {
           msg += `> **Mark Price:**\n` +
-            `> - ` + (lang === 'tr' ? `Açılış` : `Open`) + `: ${mark?.open ?? "N/A"}\n` +
-            `> - ` + (lang === 'tr' ? `Yüksek` : `High`) + `: ${mark?.high ?? "N/A"}\n` +
-            `> - ` + (lang === 'tr' ? `Düşük` : `Low`) + `: ${mark?.low ?? "N/A"}\n` +
-            `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `: ${mark?.close ?? "N/A"}\n\n`;
+            `> - ` + L(`Open`, `Açılış`, `开盘`) + `: ${mark?.open ?? "N/A"}\n` +
+            `> - ` + L(`High`, `Yüksek`, `最高`) + `: ${mark?.high ?? "N/A"}\n` +
+            `> - ` + L(`Low`, `Düşük`, `最低`) + `: ${mark?.low ?? "N/A"}\n` +
+            `> - ` + L(`Close`, `Kapanış`, `收盘`) + `: ${mark?.close ?? "N/A"}\n\n`;
         }
 
         msg += `> **Last Price:**\n` +
-          `> - ` + (lang === 'tr' ? `Açılış` : `Open`) + `: ${last?.open ?? "N/A"}\n` +
-          `> - ` + (lang === 'tr' ? `Yüksek` : `High`) + `: ${last?.high ?? "N/A"}\n` +
-          `> - ` + (lang === 'tr' ? `Düşük` : `Low`) + `: ${last?.low ?? "N/A"}\n` +
-          `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `: ${last?.close ?? "N/A"}`;
+          `> - ` + L(`Open`, `Açılış`, `开盘`) + `: ${last?.open ?? "N/A"}\n` +
+          `> - ` + L(`High`, `Yüksek`, `最高`) + `: ${last?.high ?? "N/A"}\n` +
+          `> - ` + L(`Low`, `Düşük`, `最低`) + `: ${last?.low ?? "N/A"}\n` +
+          `> - ` + L(`Close`, `Kapanış`, `收盘`) + `: ${last?.close ?? "N/A"}`;
 
         setResult(msg);
 
@@ -228,22 +238,22 @@ export default function PriceLookup({ lang, uiStrings }) {
         const range = await getRangeHighLow(activeSymbol, from, to, market);
         if (!range) return setResult(t.lookupNotFound);
 
-        let msg = `### 📊 ` + (lang === 'tr' ? `Aralık Özeti` : `Range Summary`) + `\n` +
+        let msg = `### 📊 ` + L(`Range Summary`, `Aralık Özeti`, `区间摘要`) + `\n` +
           `**Symbol:** ${activeSymbol} | **Market:** ${market.toUpperCase()}\n` +
           `**Period:** ${from} → ${to}\n\n` +
-          (lang === 'tr' ? `#### Analiz Sonuçları:` : `#### Analysis Results:`) + `\n\n`;
+          L(`#### Analysis Results:`, `#### Analiz Sonuçları:`, `#### 分析结果:`) + `\n\n`;
 
         if (market === "futures") {
           msg += `✅ **Mark Price:**\n` +
-            `- ` + (lang === 'tr' ? `Zirve` : `Peak`) + `: ${range.mark.high} (${range.mark.highTime})\n` +
-            `- ` + (lang === 'tr' ? `Dip` : `Bottom`) + `: ${range.mark.low} (${range.mark.lowTime})\n` +
-            `- ` + (lang === 'tr' ? `Değişim` : `Volatility`) + `: ${range.mark.changePct}\n\n`;
+            `- ` + L(`Peak`, `Zirve`, `峰值`) + `: ${range.mark.high} (${range.mark.highTime})\n` +
+            `- ` + L(`Bottom`, `Dip`, `谷值`) + `: ${range.mark.low} (${range.mark.lowTime})\n` +
+            `- ` + L(`Volatility`, `Değişim`, `波动`) + `: ${range.mark.changePct}\n\n`;
         }
 
         msg += `✅ **Last Price:**\n` +
-          `- ` + (lang === 'tr' ? `Zirve` : `Peak`) + `: ${range.last.high} (${range.last.highTime})\n` +
-          `- ` + (lang === 'tr' ? `Dip` : `Bottom`) + `: ${range.last.low} (${range.last.lowTime})\n` +
-          `- ` + (lang === 'tr' ? `Değişim` : `Volatility`) + `: ${range.last.changePct}`;
+          `- ` + L(`Peak`, `Zirve`, `峰值`) + `: ${range.last.high} (${range.last.highTime})\n` +
+          `- ` + L(`Bottom`, `Dip`, `谷值`) + `: ${range.last.low} (${range.last.lowTime})\n` +
+          `- ` + L(`Volatility`, `Değişim`, `波动`) + `: ${range.last.changePct}`;
 
         setResult(msg);
 
@@ -252,14 +262,14 @@ export default function PriceLookup({ lang, uiStrings }) {
         const ohlc = await getLastPriceAtSecond(activeSymbol, at, market);
         if (!ohlc) return setResult(t.lookupNoTradeData);
 
-        const msg = `### ⚡ ` + (lang === 'tr' ? `Saniyelik Hassasiyet` : `Second Precision`) + `\n` +
+        const msg = `### ⚡ ` + L(`Second Precision`, `Saniyelik Hassasiyet`, `秒级精度`) + `\n` +
           `**Time:** ${at} UTC+0 (${market.toUpperCase()})\n\n` +
           `> **Last Price Details:**\n` +
-          `> - ` + (lang === 'tr' ? `Açılış` : `Open`) + `: ${ohlc.open}\n` +
-          `> - ` + (lang === 'tr' ? `Yüksek` : `High`) + `: ${ohlc.high}\n` +
-          `> - ` + (lang === 'tr' ? `Düşük` : `Low`) + `: ${ohlc.low}\n` +
-          `> - ` + (lang === 'tr' ? `Kapanış` : `Close`) + `: ${ohlc.close}\n\n` +
-          `ℹ️ ` + (lang === 'tr' ? `Bu veri o saniye içindeki **${ohlc.count}** işleme dayanmaktadır.` : `Derived from **${ohlc.count}** individual trades in this second.`);
+          `> - ` + L(`Open`, `Açılış`, `开盘`) + `: ${ohlc.open}\n` +
+          `> - ` + L(`High`, `Yüksek`, `最高`) + `: ${ohlc.high}\n` +
+          `> - ` + L(`Low`, `Düşük`, `最低`) + `: ${ohlc.low}\n` +
+          `> - ` + L(`Close`, `Kapanış`, `收盘`) + `: ${ohlc.close}\n\n` +
+          `ℹ️ ` + L(`Derived from **${ohlc.count}** individual trades in this second.`, `Bu veri o saniye içindeki **${ohlc.count}** işleme dayanmaktadır.`, `数据来自该秒内 **${ohlc.count}** 笔成交。`);
         setResult(msg);
 
       } else if (mode === "findPrice") {
@@ -299,12 +309,12 @@ export default function PriceLookup({ lang, uiStrings }) {
 
           let msg = `## ${t.closestMissTitle}\n\n` +
             `**Symbol:** ${activeSymbol} (${market.toUpperCase()})\n` +
-            `**${lang === 'tr' ? 'Fiyat Tipi' : 'Price Type'}:** ${priceTypeLabel}\n` +
+            `**${L('Price Type', 'Fiyat Tipi', '价格类型')}:** ${priceTypeLabel}\n` +
             `**Period:** ${from} → ${to} UTC+0\n` +
-            `**${lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}:** ${targetPrice}\n\n` +
+            `**${L('Target Price', 'Hedef Fiyat', '目标价')}:** ${targetPrice}\n\n` +
             `${reachedHeader}\n\n` +
             `${t.closestMissClosestPrice}:\n` +
-            `- ${lang === 'tr' ? 'Fiyat' : 'Price'}: **${closestStr}** (${sideLabel})\n` +
+            `- ${L('Price', 'Fiyat', '价格')}: **${closestStr}** (${sideLabel})\n` +
             `- ${t.closestMissTime}: **${miss.closestTime}**\n` +
             `- ${t.closestMissDistance}: **${distStr}**\n` +
             `- ${t.closestMissPercent}: **${pctStr}**\n\n` +
@@ -327,18 +337,18 @@ export default function PriceLookup({ lang, uiStrings }) {
           `**Target:** ${targetPrice} (${typeLabel})\n` +
           `**Search Period:** ${from} → ${to}\n\n` +
           `--- \n\n` +
-          `✅ **` + (lang === 'tr' ? `İLK TEMAS ZAMANI` : `FIRST CONTACT TIME`) + `:**\n` +
+          `✅ **` + L(`FIRST CONTACT TIME`, `İLK TEMAS ZAMANI`, `首次触及时间`) + `:**\n` +
           `### 🕒 ${data.first.fmt} UTC+0\n` +
-          (data.first.isExact ? (lang === 'tr' ? `(🛡️ İşlem verileriyle milisaniye bazında doğrulandı)` : `(🛡️ Verified at millisecond level via AggTrades)`) : (lang === 'tr' ? `(📊 1 dakikalık mum verisiyle tespit edildi)` : `(📊 Detected via 1m Candle data)`)) + `\n\n`;
+          (data.first.isExact ? L(`(🛡️ Verified at millisecond level via AggTrades)`, `(🛡️ İşlem verileriyle milisaniye bazında doğrulandı)`, `(🛡️ 已通过 AggTrades 数据精确到毫秒)`) : L(`(📊 Detected via 1m Candle data)`, `(📊 1 dakikalık mum verisiyle tespit edildi)`, `(📊 通过 1 分钟 K 线数据检测)`)) + `\n\n`;
 
         if (data.others.length > 0) {
-          msg += `🔄 **` + (lang === 'tr' ? `DİĞER EŞLEŞMELER` : `OTHER MATCHES`) + ` (` + (lang === 'tr' ? `Yaklaşık` : `Approx`) + `):**\n`;
+          msg += `🔄 **` + L(`OTHER MATCHES`, `DİĞER EŞLEŞMELER`, `其他匹配`) + ` (` + L(`Approx`, `Yaklaşık`, `近似`) + `):**\n`;
           const limit = 10;
           data.others.slice(0, limit).forEach(tMatch => {
             msg += `- ${tMatch} UTC+0\n`;
           });
           if (data.others.length > limit) {
-            msg += `\n*...` + (lang === 'tr' ? `ve ${data.others.length - limit} kez daha.` : `and ${data.others.length - limit} more instances.*`);
+            msg += `\n*...` + L(`and ${data.others.length - limit} more instances.*`, `ve ${data.others.length - limit} kez daha.`, `还有 ${data.others.length - limit} 次。*`);
           }
         }
         setResult(msg);
@@ -361,12 +371,15 @@ export default function PriceLookup({ lang, uiStrings }) {
 
         const lastReachedTxt = data.last.reached ? `✅ ${t.closestMissYes}` : `❌ ${t.closestMissNo}`;
         const markReachedTxt = data.mark.reached ? `✅ ${t.closestMissYes}` : `❌ ${t.closestMissNo}`;
-        const triggerLabel = gapTriggerType || t.gapExplainerTriggerNone;
+        const prettyGapTrigger = gapTriggerType === 'MARK' ? 'Mark Price'
+          : gapTriggerType === 'LAST' ? 'Last Price'
+          : '';
+        const triggerLabel = prettyGapTrigger || t.gapExplainerTriggerNone;
 
         let msg = `## ${t.gapExplainerTitle}\n\n` +
           `**Symbol:** ${activeSymbol} | **Market:** FUTURES\n` +
           `**Period:** ${from} → ${to} UTC+0\n` +
-          (targetNum != null ? `**${lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}:** ${targetPrice}\n` : '') +
+          (targetNum != null ? `**${L('Target Price', 'Hedef Fiyat', '目标价')}:** ${targetPrice}\n` : '') +
           `**${t.gapExplainerTriggerType}:** ${triggerLabel}\n\n` +
           `--- \n\n` +
           `### ${t.gapExplainerLastPrice}\n` +
@@ -443,7 +456,7 @@ export default function PriceLookup({ lang, uiStrings }) {
       } else if (mode === "trailing") {
         if (!from || !to) return setError(errRange);
         if (!callbackRate) return setError(errCallback);
-        if (!activationPrice) return setError(lang === 'tr' ? 'Lütfen Aktivasyon Fiyatı girin.' : 'Please enter Activation Price.');
+        if (!activationPrice) return setError(L('Please enter Activation Price.', 'Lütfen Aktivasyon Fiyatı girin.', '请输入激活价格。'));
 
         const actPrice = parseFloat(activationPrice);
         const cbRate = parseFloat(callbackRate);
@@ -505,61 +518,55 @@ export default function PriceLookup({ lang, uiStrings }) {
     <div className="panel">
       <h3>{t.lookupTitle}</h3>
 
+      {toastMsg && (
+        <div role="status" aria-live="polite" className="mg-toast">
+          {toastMsg}
+        </div>
+      )}
+
       {/* Market Tabs */}
-      <div className="lookup-tabs">
-        <div
+      <div className="lookup-tabs" role="tablist" aria-label="Market">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={market === 'futures'}
           className={`lookup-tab ${market === 'futures' ? 'active' : ''}`}
           onClick={() => setMarket('futures')}
         >
           Futures
-        </div>
-        <div
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={market === 'spot'}
           className={`lookup-tab ${market === 'spot' ? 'active' : ''}`}
           onClick={() => setMarket('spot')}
         >
           Spot
-        </div>
+        </button>
       </div>
 
       {/* Mode Selection Cards */}
       <label className="label">{t.lookupMode}</label>
-      <div className="option-cards" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr" }}>
-        <div
-          className={`option-card ${mode === 'trigger' ? 'active' : ''}`}
-          onClick={() => setMode('trigger')}
-        >
-          <span>Trigger</span>
-        </div>
-        <div
-          className={`option-card ${mode === 'range' ? 'active' : ''}`}
-          onClick={() => setMode('range')}
-        >
-          <span>Range</span>
-        </div>
-        <div
-          className={`option-card ${mode === 'findPrice' ? 'active' : ''}`}
-          onClick={() => setMode('findPrice')}
-        >
-          <span>Find 🔍</span>
-        </div>
-        <div
-          className={`option-card ${mode === 'trailing' ? 'active' : ''}`}
-          onClick={() => setMode('trailing')}
-        >
-          <span>Trailing 🔄</span>
-        </div>
-        <div
-          className={`option-card ${mode === 'last1s' ? 'active' : ''}`}
-          onClick={() => setMode('last1s')}
-        >
-          <span>Last 1s</span>
-        </div>
-        <div
-          className={`option-card ${mode === 'gapExplainer' ? 'active' : ''}`}
-          onClick={() => setMode('gapExplainer')}
-        >
+      <div className="option-cards" role="tablist" aria-label="Lookup mode" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr" }}>
+        <button type="button" role="tab" aria-selected={mode === 'trigger'} className={`option-card ${mode === 'trigger' ? 'active' : ''}`} onClick={() => setMode('trigger')}>
+          <span>{L('Trigger', 'Trigger', '触发')}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === 'range'} className={`option-card ${mode === 'range' ? 'active' : ''}`} onClick={() => setMode('range')}>
+          <span>{L('Range', 'Range', '区间')}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === 'findPrice'} className={`option-card ${mode === 'findPrice' ? 'active' : ''}`} onClick={() => setMode('findPrice')} aria-label="Find price">
+          <span>{L('Find 🔍', 'Find 🔍', '查找 🔍')}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === 'trailing'} className={`option-card ${mode === 'trailing' ? 'active' : ''}`} onClick={() => setMode('trailing')} aria-label="Trailing stop">
+          <span>{L('Trailing 🔄', 'Trailing 🔄', '跟踪止损 🔄')}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === 'last1s'} className={`option-card ${mode === 'last1s' ? 'active' : ''}`} onClick={() => setMode('last1s')}>
+          <span>{L('Last 1s', 'Last 1s', '秒级')}</span>
+        </button>
+        <button type="button" role="tab" aria-selected={mode === 'gapExplainer'} className={`option-card ${mode === 'gapExplainer' ? 'active' : ''}`} onClick={() => setMode('gapExplainer')}>
           <span>{t.gapExplainerModeLabel}</span>
-        </div>
+        </button>
       </div>
 
       {mode === "last1s" && (
@@ -630,7 +637,7 @@ export default function PriceLookup({ lang, uiStrings }) {
 
         {mode === "findPrice" && (
           <div className="col-12">
-            <label className="label">{lang === 'tr' ? 'Hedef Fiyat' : 'Target Price'}</label>
+            <label className="label">{L('Target Price', 'Hedef Fiyat', '目标价')}</label>
             <input
               className="input"
               type="number"
@@ -639,9 +646,11 @@ export default function PriceLookup({ lang, uiStrings }) {
               onChange={(e) => setTargetPrice(e.target.value)}
             />
             <div className="helper" style={{ fontSize: 11, marginTop: 4, color: '#aaa' }}>
-              ℹ️ {lang === 'tr'
-                ? 'Hedef fiyata ulaşılmadıysa, en yakın gözlemlenen fiyat ve sapma otomatik olarak gösterilir.'
-                : 'If the target is not reached, the closest observed price and miss distance are shown automatically.'}
+              ℹ️ {L(
+                'If the target is not reached, the closest observed price and miss distance are shown automatically.',
+                'Hedef fiyata ulaşılmadıysa, en yakın gözlemlenen fiyat ve sapma otomatik olarak gösterilir.',
+                '若未触及目标价,系统会自动显示最接近的观察价格和差距。'
+              )}
             </div>
           </div>
         )}
@@ -649,7 +658,7 @@ export default function PriceLookup({ lang, uiStrings }) {
         {mode === "trailing" && (
           <>
             <div className="col-12" style={{ marginBottom: 4 }}>
-              <label className="label">{lang === 'tr' ? 'İşlem Yönü' : 'Trade Direction'}</label>
+              <label className="label">{L('Trade Direction', 'İşlem Yönü', '交易方向')}</label>
               <div style={{ display: 'flex', gap: 10 }}>
                 <button
                   type="button"
@@ -686,7 +695,11 @@ export default function PriceLookup({ lang, uiStrings }) {
 
             <div className="col-12">
               <div className="helper" style={{ color: '#aaa', fontSize: 11, background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: 6, border: '1px dashed rgba(255,255,255,0.1)', marginBottom: 8 }}>
-                💡 <b>Tip:</b> {lang === 'tr' ? 'Emir verildikten sonraki değişimi görebilmek için "Bitiş" zamanını emrin güncel durumundan 1-2 saat sonrasına ayarlayın.' : 'To see the movements after order placement, set the "To" time at least 1-2 hours after the "From" time.'}
+                💡 <b>Tip:</b> {L(
+                  'To see the movements after order placement, set the "To" time at least 1-2 hours after the "From" time.',
+                  'Emir verildikten sonraki değişimi görebilmek için "Bitiş" zamanını emrin güncel durumundan 1-2 saat sonrasına ayarlayın.',
+                  '为了查看下单后的价格变化,请将"结束"时间设置在"起始"时间至少 1-2 小时之后。'
+                )}
               </div>
             </div>
 
@@ -879,7 +892,7 @@ export default function PriceLookup({ lang, uiStrings }) {
       {!trailingResult && result && (
         <div style={{ marginTop: 12 }}>
           <label className="label">{t.resultLabel}</label>
-          <textarea className="textarea" value={result} readOnly />
+          <div className="copy-block">{result}</div>
         </div>
       )}
     </div>

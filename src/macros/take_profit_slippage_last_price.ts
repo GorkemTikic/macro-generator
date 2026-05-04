@@ -1,5 +1,5 @@
 // src/macros/take_profit_slippage_last_price.js
-import { fmtNum, upper, buildLastPriceOHLCBlock } from "./helpers";
+import { fmtNum, upper, buildLastPriceOHLCBlock, prettyTriggerType } from "./helpers";
 
 export const takeProfitSlippageLastPrice = {
   id: "tp_slippage_last_price",
@@ -39,7 +39,7 @@ export const takeProfitSlippageLastPrice = {
 **Symbol:** ${inputs.symbol} (${upper(inputs.side)} TP Order)
 ${inputs.placed_at_utc} UTC+0 = You placed this Take Profit (Stop-Market) order.
 
-**Trigger Condition:** ${inputs.trigger_type}
+**Trigger Condition:** ${prettyTriggerType(inputs.trigger_type)}
 **Trigger Price:** ${fmtNum(inputs.trigger_price, precision)}
 
 ${inputs.triggered_at_utc} UTC+0 = The **Last Price** reached your trigger price, and the Market order was triggered.
@@ -79,7 +79,7 @@ Hope this clarifies your queries 🙏 If you have any further questions, don’t
 **Symbol:** ${inputs.symbol} (${upper(inputs.side)} TP Order)
 ${inputs.placed_at_utc} UTC+0 = You placed this Take Profit (Stop-Market) order.
 
-**Trigger Condition:** ${inputs.trigger_type}
+**Trigger Condition:** ${prettyTriggerType(inputs.trigger_type)}
 **Trigger Price:** ${fmtNum(inputs.trigger_price, precision)}
 
 ${inputs.triggered_at_utc} UTC+0 = The **Last Price** reached your trigger price, and the Market order was triggered.
@@ -115,13 +115,108 @@ Hope this clarifies your queries 🙏 If you have any further questions, don’t
           const precision = prices?.precision ?? 8;
           const priceBlock = buildLastPriceOHLCBlock(prices, 'en', precision);
           return `**Order ID:** ${inputs.order_id}  
-**Trigger:** ${inputs.trigger_type} @ ${fmtNum(inputs.trigger_price, precision)}  
+**Trigger:** ${prettyTriggerType(inputs.trigger_type)} @ ${fmtNum(inputs.trigger_price, precision)}  
 **Executed:** ${fmtNum(inputs.executed_price, precision)}  
 **Scenario:** ${inputs.scenario_modifier}  
 
 ${priceBlock}
 
 ➡️ Your TP order was triggered by **Last Price**. The difference between your trigger and execution is due to standard market order slippage.`;
+        }
+      }
+    },
+    zh: {
+      title: "止盈 (TP) · 滑点 / 异常成交(Last Price 触发)",
+      formConfig: [
+        { name: "order_id", label: "订单号", type: "text", placeholder: "8389...", col: 6 },
+        { name: "status", label: "状态", type: "select", options: ["EXECUTED"], defaultValue: "EXECUTED", locked: true, col: 6 },
+        { name: "symbol", label: "交易对", type: "text", placeholder: "ETHUSDT", defaultValue: "ETHUSDT", col: 6 },
+        { name: "side", label: "方向(TP 订单)", type: "select", options: ["SELL", "BUY"], defaultValue: "SELL", col: 6 },
+        { name: "placed_at_utc", label: "下单时间(UTC)", type: "text", placeholder: "2025-09-11 06:53:08", col: 6 },
+        { name: "trigger_type", label: "触发类型", type: "text", defaultValue: "LAST", locked: true, col: 6 },
+        { name: "trigger_price", label: "触发价", type: "text", placeholder: "例如 4393.00", col: 6 },
+        { name: "executed_price", label: "成交价", type: "text", placeholder: "例如 4392.50", col: 6 },
+        { name: "triggered_at_utc", label: "成交时间(UTC)", type: "text", placeholder: "2025-09-11 12:30:18", col: 12 },
+        {
+          name: "scenario_modifier", label: "场景(客户投诉)", type: "select",
+          options: [
+            "止盈成交利润低于预期",
+            "止盈订单以亏损平仓"
+          ],
+          defaultValue: "止盈成交利润低于预期",
+          col: 12
+        }
+      ],
+      templates: {
+        detailed: ({ inputs, prices }) => {
+          const precision = prices?.precision ?? 8;
+          const lastBlock = buildLastPriceOHLCBlock(prices, 'zh', precision);
+          if (inputs.scenario_modifier === "止盈成交利润低于预期") {
+            return `下面分享的所有时间均为 UTC+0,请根据您所在时区进行换算:
+
+**订单号:** ${inputs.order_id}
+**交易对:** ${inputs.symbol} (${upper(inputs.side)} 止盈订单)
+${inputs.placed_at_utc} UTC+0 = 您在该时间下了这笔止盈 (Stop-Market) 订单。
+
+**触发条件:** ${prettyTriggerType(inputs.trigger_type)}
+**触发价:** ${fmtNum(inputs.trigger_price, precision)}
+
+${inputs.triggered_at_utc} UTC+0 = **Last Price** 触及了您的触发价,市价单已被触发并立即成交。
+
+市价单的成交价格为:**${fmtNum(inputs.executed_price, precision)}**
+
+我们理解,您原本期望获得更高的利润,但实际利润低于预期。这是 Stop-Market 止盈订单的预期行为。
+
+**Stop-Market 是一种条件市价单。** 一旦 Last Price 触及触发价,系统就会发送一笔市价单。市价单不保证特定的成交价,而是按当时订单簿上最优的可用价格成交。触发价与成交价之间的差异被称为*滑点*,在波动行情中较为常见。
+
+该分钟的 Last Price 详情如下:
+
+${lastBlock}
+
+如需进一步了解,可参考下列说明:
+[币安合约的 Stop 订单是什么?](https://www.binance.com/zh-CN/blog/futures/what-are-stop-orders-in-binance-futures-2094497753519691034)
+
+希望以上说明能解答您的疑问 🙏 如还有其他问题,请随时告诉我。`;
+          } else {
+            // "止盈订单以亏损平仓"
+            return `下面分享的所有时间均为 UTC+0,请根据您所在时区进行换算:
+
+**订单号:** ${inputs.order_id}
+**交易对:** ${inputs.symbol} (${upper(inputs.side)} 止盈订单)
+${inputs.placed_at_utc} UTC+0 = 您在该时间下了这笔止盈 (Stop-Market) 订单。
+
+**触发条件:** ${prettyTriggerType(inputs.trigger_type)}
+**触发价:** ${fmtNum(inputs.trigger_price, precision)}
+
+${inputs.triggered_at_utc} UTC+0 = **Last Price** 触及了您的触发价,市价单已被触发。
+
+市价单的成交价格为:**${fmtNum(inputs.executed_price, precision)}**
+
+看到一笔止盈订单以亏损平仓让人沮丧,我们能理解您的感受。这种情况通常出现在市场波动剧烈的瞬间,触发后市价单立刻按订单簿上最差的可成交价位成交,产生大额*滑点*,最终造成亏损平仓。
+
+该分钟的 Last Price 详情如下:
+
+${lastBlock}
+
+简而言之:**Stop-Market 是条件市价单**,触发后只能保证成交,无法保证成交价。在剧烈波动行情中,实际成交价可能远离您设置的触发价。
+
+如需进一步了解,可参考下列说明:
+[币安合约的 Stop 订单是什么?](https://www.binance.com/zh-CN/blog/futures/what-are-stop-orders-in-binance-futures-2094497753519691034)
+
+希望以上说明能解答您的疑问 🙏 如还有其他问题,请随时告诉我。`;
+          }
+        },
+        summary: ({ inputs, prices }) => {
+          const precision = prices?.precision ?? 8;
+          const lastBlock = buildLastPriceOHLCBlock(prices, 'zh', precision);
+          return `**订单号:** ${inputs.order_id}
+**触发:** ${prettyTriggerType(inputs.trigger_type)} @ ${fmtNum(inputs.trigger_price, precision)}
+**成交价:** ${fmtNum(inputs.executed_price, precision)}
+**场景:** ${inputs.scenario_modifier}
+
+${lastBlock}
+
+➡️ TP 订单由 **Last Price** 触发,并按当时最优市场价成交。两者的差距即为市价单的*滑点*。`;
         }
       }
     },
@@ -158,7 +253,7 @@ ${priceBlock}
 **Sembol:** ${inputs.symbol} (${upper(inputs.side)} TP Emri)
 ${inputs.placed_at_utc} UTC+0 = Tarih ve saatinde bu Take Profit (Stop-Market) emrini vermişsiniz.
 
-**Tetikleme Koşulu:** ${inputs.trigger_type}
+**Tetikleme Koşulu:** ${prettyTriggerType(inputs.trigger_type)}
 **Tetikleme Fiyatı:** ${fmtNum(inputs.trigger_price, precision)}
 
 ${inputs.triggered_at_utc} UTC+0 = Tarih ve saatinde, **Last Price**, tetikleme fiyatınıza ulaşmış ve Piyasa emirini tetiklemiştir.
@@ -198,7 +293,7 @@ Umarım bu açıklama yardımcı olmuştur 🙏 Başka sorularınız olursa çek
 **Sembol:** ${inputs.symbol} (${upper(inputs.side)} TP Emri)
 ${inputs.placed_at_utc} UTC+0 = Tarih ve saatinde bu Take Profit (Stop-Market) emrini vermişsiniz.
 
-**Tetikleme Koşulu:** ${inputs.trigger_type}
+**Tetikleme Koşulu:** ${prettyTriggerType(inputs.trigger_type)}
 **Tetikleme Fiyatı:** ${fmtNum(inputs.trigger_price, precision)}
 
 ${inputs.triggered_at_utc} UTC+0 = Tarih ve saatinde, **Last Price**, tetikleme fiyatınıza ulaşmış ve Piyasa emirini tetiklemiştir.
@@ -237,7 +332,7 @@ Umarım bu açıklama yardımcı olmuştur 🙏 Başka sorularınız olursa çek
             ? "Beklenenden az kâr"
             : "Zararla kapandı";
           return `**Emir Numarası:** ${inputs.order_id}  
-**Tetikleme:** ${inputs.trigger_type} @ ${fmtNum(inputs.trigger_price, precision)}  
+**Tetikleme:** ${prettyTriggerType(inputs.trigger_type)} @ ${fmtNum(inputs.trigger_price, precision)}  
 **Gerçekleşme:** ${fmtNum(inputs.executed_price, precision)}  
 **Senaryo:** ${scenario_tr}  
 
