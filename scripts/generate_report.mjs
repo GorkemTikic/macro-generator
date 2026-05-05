@@ -103,26 +103,37 @@ ${commitBlock}
 Return ONLY the single markdown table row. No other text.
 `;
 
-  // Retry up to 4 times on transient errors (503 overloaded, 429 quota spike)
+  // Try models in order — fall back if one is overloaded (503) or rate-limited (429)
+  const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  const MAX_RETRIES_PER_MODEL = 3;
   let response;
-  const MAX_RETRIES = 4;
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: prompt,
-      });
-      break; // success
-    } catch (err) {
-      const retryable = err?.status === 503 || err?.status === 429;
-      if (retryable && attempt < MAX_RETRIES) {
-        const waitMs = attempt * 15_000; // 15s, 30s, 45s
-        console.log(`API returned ${err.status}. Retrying in ${waitMs / 1000}s (attempt ${attempt}/${MAX_RETRIES})...`);
-        await new Promise((r) => setTimeout(r, waitMs));
-      } else {
-        throw err;
+
+  modelLoop: for (const model of MODELS) {
+    for (let attempt = 1; attempt <= MAX_RETRIES_PER_MODEL; attempt++) {
+      try {
+        console.log(`Trying model: ${model} (attempt ${attempt})...`);
+        response = await ai.models.generateContent({ model, contents: prompt });
+        console.log(`✅ Success with model: ${model}`);
+        break modelLoop;
+      } catch (err) {
+        const retryable = err?.status === 503 || err?.status === 429;
+        if (retryable && attempt < MAX_RETRIES_PER_MODEL) {
+          const waitMs = attempt * 10_000; // 10s, 20s
+          console.log(`  ${model} returned ${err.status}. Retrying in ${waitMs / 1000}s...`);
+          await new Promise((r) => setTimeout(r, waitMs));
+        } else if (retryable) {
+          console.log(`  ${model} exhausted retries. Falling back to next model...`);
+          break; // try next model
+        } else {
+          throw err; // non-retryable error — fail immediately
+        }
       }
     }
+  }
+
+  if (!response) {
+    console.error("All models failed. Giving up.");
+    process.exit(1);
   }
 
   const newRow = response.text.trim();
