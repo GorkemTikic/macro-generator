@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+    # Only trigger on actual project source changes — not reporting scripts,
+    # workflow configs, vault/docs, or the report files themselves.
+    paths:
+      - 'src/**'
+      - 'public/**'
+      - 'worker/**'
+      - 'index.html'
+      - 'package.json'
   schedule:
     # Run every day at 18:00 UTC
     - cron: '0 18 * * *'
