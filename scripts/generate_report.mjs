@@ -103,9 +103,13 @@ ${commitBlock}
 Return ONLY the single markdown table row. No other text.
 `;
 
-  // Try models in order — fall back if one is overloaded (503) or rate-limited (429)
-  const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-  const MAX_RETRIES_PER_MODEL = 3;
+  // Try models from lightest to heaviest — lite has the lowest demand/queue
+  const MODELS = [
+    "gemini-2.0-flash-lite",   // lightest, least likely to be overloaded
+    "gemini-2.0-flash",        // standard
+    "gemini-2.5-flash",        // most capable but highest demand
+  ];
+  const MAX_RETRIES_PER_MODEL = 2;
   let response;
 
   modelLoop: for (const model of MODELS) {
@@ -118,26 +122,37 @@ Return ONLY the single markdown table row. No other text.
       } catch (err) {
         const retryable = err?.status === 503 || err?.status === 429;
         if (retryable && attempt < MAX_RETRIES_PER_MODEL) {
-          const waitMs = attempt * 10_000; // 10s, 20s
+          const waitMs = 12_000;
           console.log(`  ${model} returned ${err.status}. Retrying in ${waitMs / 1000}s...`);
           await new Promise((r) => setTimeout(r, waitMs));
         } else if (retryable) {
           console.log(`  ${model} exhausted retries. Falling back to next model...`);
-          break; // try next model
+          break;
         } else {
-          throw err; // non-retryable error — fail immediately
+          throw err;
         }
       }
     }
   }
 
+  // No-AI fallback — format commit subjects directly so the report always gets updated
+  let newRow;
   if (!response) {
-    console.error("All models failed. Giving up.");
-    process.exit(1);
+    console.log("⚠️  All AI models unavailable. Generating entry from commit messages.");
+    const subjects = commitBlock
+      .split("\n")
+      .filter((l) => l.match(/^[a-f0-9]+ - /))
+      .map((l) => l.replace(/^[a-f0-9]+ - /, "").replace(/^(feat|fix|docs|chore|refactor|style|test):\s*/i, "").trim())
+      .filter(Boolean);
+    const joined = subjects.join("; ");
+    const today = todayLabel();
+    newRow = `| ${today} | ${joined} |`;
+    console.log("Fallback row:", newRow);
+  } else {
+    newRow = response.text.trim();
+    console.log("New row:", newRow);
   }
 
-  const newRow = response.text.trim();
-  console.log("New row:", newRow);
 
   // Validate it looks like a table row
   if (!newRow.startsWith("|")) {
