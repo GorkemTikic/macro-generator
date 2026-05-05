@@ -218,6 +218,7 @@ export default function App() {
             onClick={() => handleTabChange("balanceLog")}
           >
             <span className="ix">06</span> {t.tabBalanceLog}
+            <span style={{ fontSize: '9px', background: '#f6465d', color: '#fff', padding: '2px 5px', borderRadius: '4px', marginLeft: '8px', fontWeight: 'bold', verticalAlign: 'middle' }}>NEW</span>
           </button>
         </div>
       </div>
