@@ -82,6 +82,7 @@ Screenshot Library gained the missing screenshot request pipeline and agent feed
 Macro Generator entered a major product-building phase. The vault shows work beyond the visible commit titles: Margin Restrictions, a Cloudflare Worker + D1 analytics backend, an admin dashboard, privacy-aware tracking, leadership-ready Excel/PDF reporting, Price Lookup Closest Miss and Gap Explainer, Worker-based Binance proxying, LiveTicker and Smart Detect audit fixes, Turkish input handling, margin CORS fixes, and documentation/vault maintenance.
 
 ### May 2026
+| May 6, 2026 | Improved the Balance Log Analyzer's Balance Story language selector with a custom dropdown displaying flag images for enhanced clarity and user experience. |
 
 Screenshot Library continued with targeted content maintenance through the unified admin sync flow.
 
