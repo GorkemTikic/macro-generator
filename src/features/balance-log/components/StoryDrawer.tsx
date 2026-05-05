@@ -129,16 +129,16 @@ export default function StoryDrawer({
 }
 
 const LANGUAGE_OPTIONS: { value: LocalLang; label: string }[] = [
-  { value: "en", label: "English" },
-  { value: "tr", label: "Türkçe" },
-  { value: "es", label: "Español" },
-  { value: "pt", label: "Português" },
-  { value: "vi", label: "Tiếng Việt" },
-  { value: "ru", label: "Русский" },
-  { value: "uk", label: "Українська" },
-  { value: "ar", label: "العربية" },
-  { value: "zh", label: "中文" },
-  { value: "ko", label: "한국어" }
+  { value: "en", label: "🇬🇧 English" },
+  { value: "tr", label: "🇹🇷 Türkçe" },
+  { value: "es", label: "🇪🇸 Español" },
+  { value: "pt", label: "🇧🇷 Português" },
+  { value: "vi", label: "🇻🇳 Tiếng Việt" },
+  { value: "ru", label: "🇷🇺 Русский" },
+  { value: "uk", label: "🇺🇦 Українська" },
+  { value: "ar", label: "🇸🇦 العربية" },
+  { value: "zh", label: "🇨🇳 中文" },
+  { value: "ko", label: "🇰🇷 한국어" }
 ];
 
 function TabBtn({ id, label, current, set }: { id: any; label: string; current: string; set: (v: any) => void }) {
