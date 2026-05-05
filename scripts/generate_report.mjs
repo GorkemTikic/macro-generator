@@ -103,10 +103,27 @@ ${commitBlock}
 Return ONLY the single markdown table row. No other text.
 `;
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: prompt,
-  });
+  // Retry up to 4 times on transient errors (503 overloaded, 429 quota spike)
+  let response;
+  const MAX_RETRIES = 4;
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+      break; // success
+    } catch (err) {
+      const retryable = err?.status === 503 || err?.status === 429;
+      if (retryable && attempt < MAX_RETRIES) {
+        const waitMs = attempt * 15_000; // 15s, 30s, 45s
+        console.log(`API returned ${err.status}. Retrying in ${waitMs / 1000}s (attempt ${attempt}/${MAX_RETRIES})...`);
+        await new Promise((r) => setTimeout(r, waitMs));
+      } else {
+        throw err;
+      }
+    }
+  }
 
   const newRow = response.text.trim();
   console.log("New row:", newRow);
