@@ -82,7 +82,6 @@ Screenshot Library gained the missing screenshot request pipeline and agent feed
 Macro Generator entered a major product-building phase. The vault shows work beyond the visible commit titles: Margin Restrictions, a Cloudflare Worker + D1 analytics backend, an admin dashboard, privacy-aware tracking, leadership-ready Excel/PDF reporting, Price Lookup Closest Miss and Gap Explainer, Worker-based Binance proxying, LiveTicker and Smart Detect audit fixes, Turkish input handling, margin CORS fixes, and documentation/vault maintenance.
 
 ### May 2026
-| May 6, 2026 | Improved the Balance Log Analyzer's Balance Story language selector with a custom dropdown displaying flag images for enhanced clarity and user experience. |
 
 Screenshot Library continued with targeted content maintenance through the unified admin sync flow.
 
@@ -183,6 +182,7 @@ Macro Generator added annotated feature screenshots, improved trailing stop data
 | May 3, 2026 | Merged the standalone Balance Log Analyzer into Macro Generator as the Balance Log tab and renamed the product direction from FD Macro Generator to Futures DeskMate. Added scoped styling, lazy mounting, Balance Story drawer, reconciliation logic, USD-M only handling, decimal-safe accumulation, and Station-style design tokens. Also ran a full codebase audit with roughly 56 findings and fixed around 45 issues across security, pricing correctness, UX, accessibility, Worker hardening, and admin behavior. |
 | May 4, 2026 | Added Simplified Chinese support end-to-end, making the app trilingual across EN/TR/ZH for the main chrome and macro outputs. Improved macro readability by converting raw MARK/LAST tokens to Mark Price/Last Price, cleaning run-on paragraphs, removing empty markdown bars, zero-padding times, redesigning Average Calculator phase cards, making FLIP detection highly visible, replacing emoji flags with SVG flags, fixing lookup button styling, and routing local dev proxy calls through the Worker for network reliability. |
 | May 5, 2026 | Added intuitive icons (🎯 Trigger, 📊 Range, ⏱️ Last 1s) to the Price Lookup mode selection buttons for faster agent navigation. Added a "NEW" badge to the Balance Log Analyzer tab to draw attention to the recently merged feature. Set up a fully automated daily progress reporting pipeline using GitHub Actions and the Gemini AI API, which detects real source-code changes, summarises them in management-friendly language, and commits updates directly to this report — keeping the project log current without manual effort. |
+| May 6, 2026 | Improved the Balance Story language selector with a custom dropdown displaying flag images, and decluttered the top header by removing the Binance 1m OHLC badge. |
 
 ## Current Product Position
 

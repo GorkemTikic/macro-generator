@@ -164,8 +164,12 @@ Return ONLY the single markdown table row. No other text.
   const heading = monthHeading(); // e.g. "### May 2026"
   const lines = existingReport.split("\n");
 
-  // Find the heading for the current month
-  let monthIndex = lines.findIndex((l) => l.trim() === heading);
+  // Find the heading for the current month after the Detailed Timeline section
+  let timelineSectionIndex = lines.findIndex(l => l.startsWith("## Detailed Timeline - Macro Generator"));
+  if (timelineSectionIndex === -1) {
+    timelineSectionIndex = 0;
+  }
+  let monthIndex = lines.findIndex((l, i) => i > timelineSectionIndex && l.trim() === heading);
 
   if (monthIndex === -1) {
     // Month section doesn't exist yet — create it before "## Current Product Position"
