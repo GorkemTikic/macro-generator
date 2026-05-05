@@ -57,6 +57,7 @@ The brand subtitle next to the FD logo also adapts to the language:
 
 ## Recent updates
 
+- **2026-05-05** — "NEW" badge added to the `balanceLog` tab label in `App.tsx` to surface the feature to first-time users. See [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]].
 - **2026-05-04** — `Lang` type extended to `'en' | 'tr' | 'zh'`. Third (CN) flag button added with inline-SVG China flag (red field, gold central star + 4 arc stars). Brand subtitle gained zh variant. See [[decisions/2026-05-04-add-zh-cn-trilingual]] and [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]].
 - **2026-05-03** — `balanceLog` tab added (Balance Log Analyzer absorbed into the host); see [[decisions/2026-05-03-merged-into-macro-generator-tab]].
 
@@ -65,6 +66,7 @@ The brand subtitle next to the FD logo also adapts to the language:
 - [[sources/sessions/2026-04-22-margin-restrictions-build]] — `margin` tab added
 - [[sources/sessions/2026-05-03-merge-into-macro-generator-and-redesign]] — `balanceLog` tab added
 - [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]] — `zh` language + CN flag
+- [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]] — "NEW" badge on Balance Log tab
 
 ## Related
 

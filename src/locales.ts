@@ -1,6 +1,5 @@
 export const uiStrings = {
   en: {
-    badge: "Binance 1m OHLC",
     tabMacro: "Macro Generator",
     tabLookup: "Price Lookup",
     tabFunding: "Funding Macro",
@@ -229,7 +228,6 @@ export const uiStrings = {
     },
   },
   tr: {
-    badge: "Binance 1m OHLC",
     tabMacro: "Makro Oluşturucu",
     tabLookup: "Fiyat Sorgulama",
     tabFunding: "Funding Makrosu",
@@ -464,7 +462,6 @@ export const uiStrings = {
   // Futures, Mark Price, Last Price) are kept in English where they appear
   // as proper nouns — same convention as the existing TR translations.
   zh: {
-    badge: "Binance 1分钟 OHLC",
     tabMacro: "客服宏生成器",
     tabLookup: "价格查询",
     tabFunding: "资金费宏",

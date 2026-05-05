@@ -260,8 +260,7 @@ body {
 }
 
 /* Source disclaimer pill */
-.badge,
-.src-badge {
+.badge {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -274,8 +273,7 @@ body {
   border-radius: var(--r-pill);
   background: var(--bg-3);
 }
-.badge::before,
-.src-badge .dot {
+.badge::before {
   content: "";
   width: 5px; height: 5px;
   border-radius: 50%;

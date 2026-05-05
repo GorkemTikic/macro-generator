@@ -31,6 +31,8 @@
 - [[sources/sessions/2026-05-03-full-codebase-audit-and-remediation]] - Full codebase audit (~56 findings) + remediation pass (~45 fixes): security, pricing correctness, a11y, Worker hardening
 - [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]] - Trilingual EN/TR/ZH end-to-end + macro-output readability polish (raw `MARK` token, run-on paragraphs, empty `>` bar, time padding) + Average Calculator phase-card redesign + FLIP visibility + inline-SVG flags + Vite dev proxy via Worker
 - [[sources/sessions/2026-05-05-automated-progress-reporting-gemini]] - Automated progress reporting via Gemini AI & GitHub Actions
+- [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]] - Price Lookup mode-tab emoji icons (Trigger 🎯, Range 📊, Last 1s ⏱️) + "NEW" badge on Balance Log tab
+- [[sources/sessions/2026-05-06-balance-story-flag-dropdown]] - Balance Story drawer: `<select>` → custom `LangSelect` component with `flagcdn.com` flag images; `LANGUAGE_OPTIONS` gained `flag` field
 
 ### Docs
 - [[sources/docs/2026-03-21-readme]] - README.md (Last Updated 2026-03-21)

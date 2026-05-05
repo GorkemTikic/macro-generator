@@ -11,10 +11,14 @@
             "id": "a4346d9056b41903",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Graph view"
+              "type": "markdown",
+              "state": {
+                "file": "index.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "index"
             }
           }
         ]
@@ -181,21 +185,26 @@
   },
   "active": "a4346d9056b41903",
   "lastOpenFiles": [
+    "bugs/2026-04-22-cors-failed-to-fetch.md",
+    "sources/sessions/2026-05-06-balance-story-flag-dropdown.md",
+    "sources/sessions/2026-05-05-ux-polish-icons-new-badge.md",
+    "entities/balance-log-feature.md",
+    "CLAUDE.md",
+    "log.md",
+    "lint-report.md",
     "wiki.md",
+    "index.md",
     "concepts/sync-on-change-protocol.md",
     "decisions/2026-04-27-worker-as-binance-cors-proxy.md",
     "sources/sessions/2026-05-03-merge-into-macro-generator-and-redesign.md",
-    "index.md",
     "index.md.tmp.34736.1777774967198",
     "index.md.tmp.34736.1777774936339",
-    "log.md",
     "syntheses/balance-log-feature-overview.md",
     "concepts/balance-log-parser-heuristics.md",
     "concepts/dynamic-balance-log-types.md",
     "concepts/usds-m-reconciliation-math.md",
     "bugs/2026-05-03-bl-typefilter-toggle-semantics.md",
     "bugs/2026-05-03-bl-hidden-filters-silent-row-loss.md",
-    "entities/balance-log-feature.md",
     "decisions/2026-05-03-bl-visible-row-filters.md",
     "decisions/2026-05-03-bl-decimal-safe-narrative-accumulation.md",
     "decisions/2026-05-03-bl-hidden-types-model.md",
@@ -204,11 +213,6 @@
     "bugs/2026-05-03-circular-css-var-broke-drawer-button.md",
     "decisions/2026-05-03-station-design-system-adoption.md",
     "decisions/2026-05-03-merged-into-macro-generator-tab.md",
-    "decisions/2026-05-03-futures-deskmate-rename.md",
-    "concepts/css-token-bridge.md",
-    "entities/balance-log-overrides-css.md",
-    "decisions/vanilla-css-glass.md",
-    "decisions/precision-truncation-not-rounding.md",
     "index.md.tmp.20484.1777201895859",
     "index.md.tmp.20484.1777201884614"
   ]

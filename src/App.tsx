@@ -85,7 +85,6 @@ export default function App() {
           </div>
           <div className="appbar-right">
             <LiveTicker />
-            <span className="src-badge"><span className="dot" /> {t.badge}</span>
             <div className="lang-switcher" role="group" aria-label="Language">
               <button
                 className={`lang-btn ${lang === 'en' ? 'active' : ''}`}

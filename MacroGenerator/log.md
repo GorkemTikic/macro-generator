@@ -338,3 +338,50 @@ Cleanup:
 - Added `scripts/generate_report.mjs` using `@google/genai` to summarize commits for both `macro-generator` and `screenshot-library`.
 - Copied `PROJECT_PROGRESS_REPORT.md` and `render-progress-report-pdf.mjs` into `reports/` folder.
 - Configured workflow to automatically open a Pull Request with the AI summary and updated PDF.
+
+---
+
+## [2026-05-05] ingest | ux-polish-icons-new-badge
+
+Master session note:
+- `sources/sessions/2026-05-05-ux-polish-icons-new-badge.md`
+
+New pages (1):
+- `sources/sessions/2026-05-05-ux-polish-icons-new-badge.md`
+
+Updated pages (2):
+- `entities/price-lookup.md` — added 2026-05-05 bug-history entry: emoji icons on Trigger 🎯 / Range 📊 / Last 1s ⏱️ tabs; added session back-link in Sources.
+- `entities/app-tsx.md` — added 2026-05-05 Recent updates entry: "NEW" badge on `balanceLog` tab; added session back-link in Sources.
+
+Index + log updates:
+- `index.md` — two new session entries.
+- `log.md` — this entry.
+
+Files touched in code:
+- `src/components/PriceLookup.tsx` — emoji icons on 3 mode-tab buttons
+- `src/App.tsx` — "NEW" badge on Balance Log tab label
+
+---
+
+## [2026-05-06] ingest | balance-story-flag-dropdown
+
+Master session note:
+- `sources/sessions/2026-05-06-balance-story-flag-dropdown.md`
+
+New pages (1):
+- `sources/sessions/2026-05-06-balance-story-flag-dropdown.md`
+
+Updated pages (1):
+- `entities/balance-log-feature.md` — added Recent updates section with 2026-05-06 `LangSelect` component detail; added session back-link in Sources.
+
+Index + log updates:
+- `index.md` — new session entry.
+- `log.md` — this entry.
+
+Files touched in code:
+- `src/features/balance-log/components/StoryDrawer.tsx` — replaced `<select>` with custom `LangSelect` headless dropdown using `flagcdn.com` flag images (107 insertions). `LANGUAGE_OPTIONS` gained a `flag` (ISO 3166-1 alpha-2) field for each of the 10 languages.
+
+Headline outcomes:
+- Balance Story drawer language picker now matches the visual quality of the main app's flag switcher. Uses `flagcdn.com/20x15/{code}.png` real flag images in both the trigger button and the option rows.
+- Closes via `onBlur` + 150 ms delay so `onMouseDown` on options fires before the blur collapses the list (avoids selection-race bug).
+- Styled entirely through `--bl-*` CSS tokens — consistent with the [[concepts/css-token-bridge]] pattern.

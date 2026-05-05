@@ -45,12 +45,14 @@ All labels and error messages EN/TR via `uiStrings`.
 - Session 530e the user found this page "inadequate as a chart/price tool for agents" — but instead of adding new features, a separate Margin Restrictions tab was installed. See [[sources/sessions/2026-04-22-margin-restrictions-build]].
 - 2026-04-27: Closest Miss + Gap Explainer added. See [[sources/sessions/2026-04-27-price-lookup-closest-miss-gap-explainer]].
 - 2026-05-02: Trailing Stop output split into Customer / Agent sections with copy buttons; agent breakdown now lists `Activation reached`, `True Trough/Peak`, `Required trigger threshold`, `First trade crossing threshold` as four explicit lines + "Fill price not available from this analysis" note. Granularity label distinguishes Futures aggTrades from Spot 1s klines. See [[sources/sessions/2026-05-02-trailing-stop-clusdt-tick-precision]].
+- 2026-05-05: Emoji icons added to three mode-tab buttons — `Trigger 🎯`, `Range 📊`, `Last 1s ⏱️` — to match the icons already on `Find 🔍` and `Trailing 🔄`. All three follow the `L(en, tr, zh)` pattern. See [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]].
 
 ## Sources
 
 - [[sources/sessions/2026-04-22-margin-restrictions-build]] — discussion of enhancement options
 - [[sources/sessions/2026-04-27-price-lookup-closest-miss-gap-explainer]] — Closest Miss + Gap Explainer build
 - [[sources/sessions/2026-05-02-trailing-stop-clusdt-tick-precision]] — Trailing Stop output redesign + tick-precision verification
+- [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]] — emoji icons on Trigger / Range / Last 1s buttons
 
 ## Related
 

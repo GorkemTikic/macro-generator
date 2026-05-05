@@ -120,9 +120,14 @@ threads `lang` and the relevant chunk of `t` into the component.
 - [[decisions/2026-05-03-bl-visible-row-filters]] — archived
 - [[decisions/2026-05-03-station-design-system-adoption]]
 
+## Recent updates
+
+- **2026-05-06** — `StoryDrawer.tsx`: replaced the plain `<select>` language picker with a custom `LangSelect` component. The component fetches flag images from `flagcdn.com/20x15/{code}.png` and renders a styled dropdown that respects `--bl-*` CSS tokens. `LANGUAGE_OPTIONS` gained a `flag` (ISO 3166-1 alpha-2) field. See [[sources/sessions/2026-05-06-balance-story-flag-dropdown]] and [[concepts/css-token-bridge]].
+
 ## Sources
 
 - [[sources/sessions/2026-05-03-merge-into-macro-generator-and-redesign]]
+- [[sources/sessions/2026-05-06-balance-story-flag-dropdown]] — custom flag-image dropdown in StoryDrawer
 
 ## Related
 
