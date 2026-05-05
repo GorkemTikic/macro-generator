@@ -30,6 +30,7 @@
 - [[sources/sessions/2026-05-03-merge-into-macro-generator-and-redesign]] - Balance Log merge + Futures DeskMate rename + Station design system + Vite proxy CORS bypass
 - [[sources/sessions/2026-05-03-full-codebase-audit-and-remediation]] - Full codebase audit (~56 findings) + remediation pass (~45 fixes): security, pricing correctness, a11y, Worker hardening
 - [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]] - Trilingual EN/TR/ZH end-to-end + macro-output readability polish (raw `MARK` token, run-on paragraphs, empty `>` bar, time padding) + Average Calculator phase-card redesign + FLIP visibility + inline-SVG flags + Vite dev proxy via Worker
+- [[sources/sessions/2026-05-05-automated-progress-reporting-gemini]] - Automated progress reporting via Gemini AI & GitHub Actions
 
 ### Docs
 - [[sources/docs/2026-03-21-readme]] - README.md (Last Updated 2026-03-21)

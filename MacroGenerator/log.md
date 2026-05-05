@@ -332,3 +332,9 @@ Cleanup:
 - entities/pricing-ts.md (per-market trailing-stop data-source table; back-links)
 - entities/price-lookup.md (2026-05-02 bug-history entry; back-links)
 - index.md (new source + bug + decision; new 2026-05-02 decisions section)
+
+## [2026-05-05] ingest | automated-progress-reporting-gemini
+- Added GitHub Actions workflow (`.github/workflows/generate_progress_report.yml`) to run daily.
+- Added `scripts/generate_report.mjs` using `@google/genai` to summarize commits for both `macro-generator` and `screenshot-library`.
+- Copied `PROJECT_PROGRESS_REPORT.md` and `render-progress-report-pdf.mjs` into `reports/` folder.
+- Configured workflow to automatically open a Pull Request with the AI summary and updated PDF.
