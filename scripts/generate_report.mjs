@@ -32,9 +32,14 @@ async function main() {
   console.log("Gathering recent changes...");
 
   // Get commits from the last 24 hours
-  const commits = runCmd('git log --since="24 hours ago" --pretty=format:"%h - %s (%an)"');
+  const commits1 = runCmd('git log --since="24 hours ago" --pretty=format:"%h - %s (%an)"');
+  const commits2 = runCmd('git -C screenshot-library log --since="24 hours ago" --pretty=format:"%h - %s (%an)"');
   
-  if (!commits) {
+  let allCommits = "";
+  if (commits1) allCommits += `[Macro Generator Commits]:\n${commits1}\n\n`;
+  if (commits2) allCommits += `[Screenshot Library Commits]:\n${commits2}\n\n`;
+
+  if (!allCommits) {
     console.log("No new commits in the last 24 hours. Exiting.");
     process.exit(0);
   }
@@ -65,7 +70,7 @@ You are an expert technical writer and project manager.
 Your task is to review the recent technical changes in the "Macro Generator" and "Screenshot Library" repositories and write a short, management-friendly summary of the progress made today.
 
 Recent Commits:
-${commits}
+${allCommits}
 
 Relevant Vault Notes (if any):
 ${vaultNotes}
