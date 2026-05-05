@@ -188,6 +188,7 @@ export default function App() {
             onClick={() => handleTabChange("faq")}
           >
             <span className="ix">02</span> {t.tabFaq}
+            <span style={{ fontSize: '9px', background: '#f6465d', color: '#fff', padding: '2px 5px', borderRadius: '4px', marginLeft: '8px', fontWeight: 'bold', verticalAlign: 'middle' }}>NEW</span>
           </button>
           <button
             role="tab"
