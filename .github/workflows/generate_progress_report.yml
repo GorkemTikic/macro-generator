@@ -1,0 +1,54 @@
+name: Generate Progress Report
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Run every day at 18:00 UTC
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed to fetch full git history
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: |
+          npm install @google/genai markdown-it playwright
+          npx playwright install chromium --with-deps
+
+      - name: Generate Report
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          node scripts/generate_report.mjs
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          title: "docs: Update Project Progress Report"
+          commit-message: "docs: Update Project Progress Report via Gemini AI"
+          branch: "update-progress-report"
+          delete-branch: true
+          body: |
+            ## Automated Progress Report Update
+            
+            This PR was automatically created by the GitHub Action workflow using the Gemini API.
+            It includes the latest summary of work and an updated PDF report.
+            
+            Please review the changes to the Markdown file before merging.
