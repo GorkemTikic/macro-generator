@@ -12,6 +12,19 @@ Note: this report is written for management review. It intentionally avoids deep
 
 Macro Generator source note: the first version of this report used mostly commit history. The revised Macro Generator section also uses the committed vault files under `MacroGenerator/`, especially `index.md`, `log.md`, `sources/sessions/`, `decisions/`, `bugs/`, and `syntheses/`. This gives a more accurate picture of actual working days, product decisions, audit work, and remediation effort.
 
+
+### 2024-07-31 Update
+
+This past period saw significant advancements in our internal tooling, focusing on enhanced automation, improved user experience, and robust system stability.
+
+**Key Progress Highlights:**
+
+*   **Automated Reporting & Enhanced Insights:** We successfully established automated progress reporting for the Macro Generator. A major step in this initiative was the crucial integration of the **Screenshot Library** directly into these automated reports. This now allows our system to automatically include visual evidence and context in reports, significantly improving clarity and efficiency for project stakeholders. Furthermore, we refined the reporting mechanism to trigger only on relevant changes, ensuring more focused and efficient updates.
+*   **User Experience Enhancements for Agents:**
+    *   The **Balance Log Analyzer** tab in the Macro Generator now features a prominent "NEW" badge, making recent additions more discoverable for users.
+    *   The **Price Lookup Tool** has been updated with clear, intuitive icons on its buttons, enhancing usability and visual appeal.
+*   **System Stability & AI Model Management:** We diligently managed and stabilized the Macro Generator's integration with our various AI models (e.g., Gemini series). This involved ensuring the use of correct API model IDs and proactively adapting to changes in API availability, which ensures continuous operation and consistent performance of our AI-powered features.
+
 ## How To Update This Report
 
 When new work is completed, add one new line under the correct project and month:
