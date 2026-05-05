@@ -31,8 +31,8 @@ function runCmd(cmd) {
 async function main() {
   console.log("Gathering recent changes...");
 
-  // Get commits from the last 24 hours
-  const commits1 = runCmd('git log --since="24 hours ago" --pretty=format:"%h - %s (%an)"');
+  // Get commits from the last 24 hours (excluding Vault/Wiki)
+  const commits1 = runCmd('git log --since="24 hours ago" --pretty=format:"%h - %s (%an)" -- . ":(exclude)MacroGenerator" ":(exclude)CLAUDE*"');
   const commits2 = runCmd('git -C screenshot-library log --since="24 hours ago" --pretty=format:"%h - %s (%an)"');
   
   let allCommits = "";
@@ -44,25 +44,6 @@ async function main() {
     process.exit(0);
   }
 
-  // Get changed files in the last 24 hours
-  const changedFiles = runCmd('git log --since="24 hours ago" --name-only --pretty=format:""')
-    .split("\n")
-    .filter(f => f.trim() !== "");
-  
-  const uniqueFiles = [...new Set(changedFiles)];
-  
-  let vaultNotes = "";
-  // If the vault was modified, read the log.md or other markdown files to add context
-  const vaultFiles = uniqueFiles.filter(f => f.startsWith("MacroGenerator/") && f.endsWith(".md"));
-  for (const file of vaultFiles) {
-    try {
-      const content = await fs.readFile(path.join(rootDir, file), "utf8");
-      vaultNotes += `\n--- File: ${file} ---\n${content.substring(0, 2000)}\n`; // Limit length
-    } catch (e) {
-      // ignore
-    }
-  }
-
   console.log("Sending data to Gemini for summary...");
 
   const prompt = `
@@ -71,9 +52,6 @@ Your task is to review the recent technical changes in the "Macro Generator" and
 
 Recent Commits:
 ${allCommits}
-
-Relevant Vault Notes (if any):
-${vaultNotes}
 
 Instructions:
 1. Write in clear, professional English.
@@ -85,7 +63,7 @@ Instructions:
 `;
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.0-flash',
     contents: prompt,
   });
 
