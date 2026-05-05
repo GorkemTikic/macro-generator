@@ -550,10 +550,10 @@ export default function PriceLookup({ lang, uiStrings }) {
       <label className="label">{t.lookupMode}</label>
       <div className="option-cards" role="tablist" aria-label="Lookup mode" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr 1fr" }}>
         <button type="button" role="tab" aria-selected={mode === 'trigger'} className={`option-card ${mode === 'trigger' ? 'active' : ''}`} onClick={() => setMode('trigger')}>
-          <span>{L('Trigger', 'Trigger', '触发')}</span>
+          <span>{L('Trigger 🎯', 'Trigger 🎯', '触发 🎯')}</span>
         </button>
         <button type="button" role="tab" aria-selected={mode === 'range'} className={`option-card ${mode === 'range' ? 'active' : ''}`} onClick={() => setMode('range')}>
-          <span>{L('Range', 'Range', '区间')}</span>
+          <span>{L('Range 📊', 'Range 📊', '区间 📊')}</span>
         </button>
         <button type="button" role="tab" aria-selected={mode === 'findPrice'} className={`option-card ${mode === 'findPrice' ? 'active' : ''}`} onClick={() => setMode('findPrice')} aria-label="Find price">
           <span>{L('Find 🔍', 'Find 🔍', '查找 🔍')}</span>
@@ -562,7 +562,7 @@ export default function PriceLookup({ lang, uiStrings }) {
           <span>{L('Trailing 🔄', 'Trailing 🔄', '跟踪止损 🔄')}</span>
         </button>
         <button type="button" role="tab" aria-selected={mode === 'last1s'} className={`option-card ${mode === 'last1s' ? 'active' : ''}`} onClick={() => setMode('last1s')}>
-          <span>{L('Last 1s', 'Last 1s', '秒级')}</span>
+          <span>{L('Last 1s ⏱️', 'Last 1s ⏱️', '秒级 ⏱️')}</span>
         </button>
         <button type="button" role="tab" aria-selected={mode === 'gapExplainer'} className={`option-card ${mode === 'gapExplainer' ? 'active' : ''}`} onClick={() => setMode('gapExplainer')}>
           <span>{t.gapExplainerModeLabel}</span>
