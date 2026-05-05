@@ -73,14 +73,16 @@ export default function App() {
         {/* Header: brand-mark + name + subtitle | live ticker + source pill + lang + admin */}
         <div className="appbar">
           <div className="header brand">
-            <div className="brand-mark" aria-hidden="true">FD</div>
-            <div className="brand-name">Futures DeskMate</div>
+            <div 
+              onClick={() => setActiveTab('macro')}
+              style={{ display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}
+              title="Go to main page"
+            >
+              <div className="brand-mark" aria-hidden="true">FD</div>
+              <div className="brand-name">Futures DeskMate</div>
+            </div>
             <span className="brand-sub">
-              {lang === 'tr'
-                ? 'Binance Futures destek çalışma alanı'
-                : lang === 'zh'
-                  ? '币安合约客服工作台'
-                  : 'Binance Futures support workspace'}
+              Created by CS Gorkem T
             </span>
           </div>
           <div className="appbar-right">
