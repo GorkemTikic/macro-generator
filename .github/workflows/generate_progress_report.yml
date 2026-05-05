@@ -13,7 +13,7 @@ on:
       - 'index.html'
       - 'package.json'
   schedule:
-    # Run every day at 18:00 UTC
+    # Run every day at 18:00 UTC (21:00 Istanbul)
     - cron: '0 18 * * *'
   workflow_dispatch:
 
@@ -22,13 +22,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      pull-requests: write
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Needed to fetch full git history
+          fetch-depth: 0
 
       - name: Checkout screenshot-library
         uses: actions/checkout@v4
@@ -43,21 +42,18 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: |
-          npm install @google/genai markdown-it playwright
-          npx playwright install chromium --with-deps
+        run: npm install @google/genai
 
       - name: Generate Report
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-        run: |
-          node scripts/generate_report.mjs
+        run: node scripts/generate_report.mjs
 
       - name: Commit updated report
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add reports/PROJECT_PROGRESS_REPORT.md reports/PROJECT_PROGRESS_REPORT_STYLED.html reports/PROJECT_PROGRESS_REPORT_STYLED.pdf
+          git add outputs/PROJECT_PROGRESS_REPORT.md
           git diff --cached --quiet && echo "No changes to commit" && exit 0
           git commit -m "docs: update project progress report [skip ci]"
           git push
