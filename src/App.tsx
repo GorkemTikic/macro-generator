@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import "./styles.css";
 import PriceLookup from "./components/PriceLookup";
+import FaqSearcher from "./components/FaqSearcher";
 import FundingMacro from "./components/FundingMacro";
 import MacroGenerator from "./components/MacroGenerator";
 import AverageCalculator from "./components/AverageCalculator";
@@ -74,7 +75,7 @@ export default function App() {
         <div className="appbar">
           <div className="header brand">
             <div 
-              onClick={() => setActiveTab('macro')}
+              onClick={() => handleTabChange("macros")}
               style={{ display: 'flex', alignItems: 'center', gap: '14px', cursor: 'pointer' }}
               title="Go to main page"
             >
@@ -182,11 +183,19 @@ export default function App() {
           </button>
           <button
             role="tab"
+            aria-selected={activeTab === "faq"}
+            className={activeTab === "faq" ? "tab active" : "tab"}
+            onClick={() => handleTabChange("faq")}
+          >
+            <span className="ix">02</span> {t.tabFaq}
+          </button>
+          <button
+            role="tab"
             aria-selected={activeTab === "lookup"}
             className={activeTab === "lookup" ? "tab active" : "tab"}
             onClick={() => handleTabChange("lookup")}
           >
-            <span className="ix">02</span> {t.tabLookup}
+            <span className="ix">03</span> {t.tabLookup}
           </button>
           <button
             role="tab"
@@ -194,7 +203,7 @@ export default function App() {
             className={activeTab === "funding" ? "tab active" : "tab"}
             onClick={() => handleTabChange("funding")}
           >
-            <span className="ix">03</span> {t.tabFunding}
+            <span className="ix">04</span> {t.tabFunding}
           </button>
           <button
             role="tab"
@@ -202,7 +211,7 @@ export default function App() {
             className={activeTab === "average" ? "tab active" : "tab"}
             onClick={() => handleTabChange("average")}
           >
-            <span className="ix">04</span> {t.tabAverage}
+            <span className="ix">05</span> {t.tabAverage}
           </button>
           <button
             role="tab"
@@ -210,7 +219,7 @@ export default function App() {
             className={activeTab === "margin" ? "tab active" : "tab"}
             onClick={() => handleTabChange("margin")}
           >
-            <span className="ix">05</span> {t.tabMargin}
+            <span className="ix">06</span> {t.tabMargin}
           </button>
           <button
             role="tab"
@@ -218,7 +227,7 @@ export default function App() {
             className={activeTab === "balanceLog" ? "tab active" : "tab"}
             onClick={() => handleTabChange("balanceLog")}
           >
-            <span className="ix">06</span> {t.tabBalanceLog}
+            <span className="ix">07</span> {t.tabBalanceLog}
             <span style={{ fontSize: '9px', background: '#f6465d', color: '#fff', padding: '2px 5px', borderRadius: '4px', marginLeft: '8px', fontWeight: 'bold', verticalAlign: 'middle' }}>NEW</span>
           </button>
         </div>
@@ -234,6 +243,13 @@ export default function App() {
            className={activeTab === "macros" ? "tab-panel" : undefined}>
         <MacroGenerator lang={lang} uiStrings={t} />
       </div>
+
+      {openedTabs.has("faq") && (
+        <div style={{ display: activeTab === "faq" ? "block" : "none" }}
+             className={activeTab === "faq" ? "tab-panel" : undefined}>
+          <FaqSearcher lang={lang} />
+        </div>
+      )}
 
       <div style={{ display: activeTab === "lookup" ? "block" : "none" }}
            className={activeTab === "lookup" ? "tab-panel" : undefined}>

@@ -15,12 +15,13 @@ const _ENV = ((import.meta as unknown as { env?: ImportMetaEnv }).env) ?? ({} as
 const ANALYTICS_DISABLED = !_ENV.DEV && !_ENV.VITE_ANALYTICS_URL;
 const ENDPOINT = (_ENV.DEV ? '' : (_ENV.VITE_ANALYTICS_URL ?? '')).replace(/\/$/, '');
 
-export type Tab = 'macros' | 'lookup' | 'funding' | 'average' | 'margin' | 'balanceLog' | 'admin';
+export type Tab = 'macros' | 'faq' | 'lookup' | 'funding' | 'average' | 'margin' | 'balanceLog' | 'admin';
 
 /** Human-readable labels for each tab id. Used by the Admin Dashboard so the
  *  Tab Usage chart shows "Balance Log" rather than "balanceLog". */
 export const TAB_LABELS: Readonly<Record<Tab, string>> = {
   macros:     'Macros',
+  faq:        'FAQ Searcher',
   lookup:     'Price Lookup',
   funding:    'Funding Macro',
   average:    'Position History',
@@ -40,6 +41,8 @@ export type EventType =
   | 'lookup_error'
   | 'trailing_stop_checked'
   | 'gap_explainer_checked'
+  | 'faq_search'
+  | 'faq_copy'
   | 'funding_query'
   | 'funding_error'
   | 'average_calc_run'

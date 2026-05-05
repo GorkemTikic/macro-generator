@@ -1,6 +1,7 @@
 export const uiStrings = {
   en: {
     tabMacro: "Macro Generator",
+    tabFaq: "FAQ Searcher",
     tabLookup: "Price Lookup",
     tabFunding: "Funding Macro",
     tabMargin: "Margin Restrictions",
@@ -229,6 +230,7 @@ export const uiStrings = {
   },
   tr: {
     tabMacro: "Makro Oluşturucu",
+    tabFaq: "FAQ Arayıcı",
     tabLookup: "Fiyat Sorgulama",
     tabFunding: "Funding Makrosu",
     tabMargin: "Margin Kısıtlamaları",
@@ -463,6 +465,7 @@ export const uiStrings = {
   // as proper nouns — same convention as the existing TR translations.
   zh: {
     tabMacro: "客服宏生成器",
+    tabFaq: "FAQ 搜索器",
     tabLookup: "价格查询",
     tabFunding: "资金费宏",
     tabMargin: "保证金限制",
