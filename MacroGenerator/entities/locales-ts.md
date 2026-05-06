@@ -20,7 +20,7 @@ block was added.
 
 ```ts
 export const uiStrings = {
-  en: { tabMacro, tabLookup, tabFunding, tabMargin, ... },
+  en: { tabMacro, tabFaq, tabLookup, tabFunding, tabMargin, ... },
   tr: { ... same keys, Turkish ... },
   zh: { ... same keys, Simplified Chinese ... },
 }
@@ -55,12 +55,14 @@ See [[concepts/bilingual-tr-en]] (now trilingual) ·
 
 ## Recent updates
 
+- **2026-05-06** - `tabFaq` added in EN/TR/ZH for the new FAQ Searcher tab. See [[sources/sessions/2026-05-06-faq-searcher-deploy]].
 - **2026-05-04** — added the full `zh:` block (~230 keys mirroring the `en` and `tr` shapes); changed `gapExplainerTriggerMark` and `gapExplainerTriggerLast` from `"MARK"` / `"LAST"` to `"Mark Price"` / `"Last Price"` (EN + TR + ZH). See [[bugs/2026-05-04-trigger-type-rendered-as-raw-token]].
 
 ## Sources
 
 - [[sources/sessions/2026-04-22-margin-restrictions-build]] — `tabMargin` key added
 - [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]] — `zh` block added
+- [[sources/sessions/2026-05-06-faq-searcher-deploy]] - `tabFaq` added
 
 ## Related
 

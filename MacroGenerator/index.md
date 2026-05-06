@@ -4,7 +4,7 @@
 > React + Vite + TypeScript. Binance Futures support workspace for
 > agents — Macro Generator, Price Lookup, Funding, Position History
 > (Average Calculator), Margin Restrictions, Balance Log Analyzer,
-> and a token-gated Admin/Analytics dashboard.
+> FAQ Searcher, and a token-gated Admin/Analytics dashboard.
 > This vault follows the llm-wiki pattern. See [[CLAUDE]].
 
 > **Vault note (2026-05-03)**: the standalone Balance Log Analyzer
@@ -33,6 +33,7 @@
 - [[sources/sessions/2026-05-05-automated-progress-reporting-gemini]] - Automated progress reporting via Gemini AI & GitHub Actions
 - [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]] - Price Lookup mode-tab emoji icons (Trigger 🎯, Range 📊, Last 1s ⏱️) + "NEW" badge on Balance Log tab
 - [[sources/sessions/2026-05-06-balance-story-flag-dropdown]] - Balance Story drawer: `<select>` → custom `LangSelect` component with `flagcdn.com` flag images; `LANGUAGE_OPTIONS` gained `flag` field
+- [[sources/sessions/2026-05-06-faq-searcher-deploy]] - FAQ Searcher restored from the older project copy, simplified to keyword search, deployed to GitHub Pages, and marked "NEW"
 
 ### Docs
 - [[sources/docs/2026-03-21-readme]] - README.md (Last Updated 2026-03-21)
@@ -56,6 +57,7 @@
 - [[entities/price-lookup]] - Price lookup (4 modes + trailing stop simulation)
 - [[entities/average-calculator]] - Position open/close average (running inventory)
 - [[entities/margin-restrictions]] - Margin transfer-in restricted asset list
+- [[entities/faq-searcher]] - Keyword-based official FAQ/reference search + citation packs
 - [[entities/live-ticker]] - Header WebSocket ticker
 - [[entities/balance-log-feature]] - Balance Log Analyzer feature folder (`src/features/balance-log/`)
 - [[entities/balance-log-overrides-css]] - Hand-edited CSS bridge between BL and host design system

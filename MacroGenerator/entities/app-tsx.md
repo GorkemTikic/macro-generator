@@ -14,7 +14,7 @@ chip in the header.
 
 ## Responsibilities
 
-- 6 tab UI: **macros**, **lookup**, **funding**, **average**, **margin**, **balanceLog**
+- 7 tab UI: **macros**, **faq**, **lookup**, **funding**, **average**, **margin**, **balanceLog**
 - Token-gated Admin chip (visible only when `localStorage._fd_admin_token` is set)
 - Prop drill language state (`lang`: `'en' | 'tr' | 'zh'`) and `uiStrings` translations to children
 - Shows `LiveTicker` component in header (current price of the active symbol)
@@ -25,6 +25,7 @@ chip in the header.
 | Tab | Component | Page |
 |---|---|---|
 | `macros` | [[entities/macro-generator-component]] | TP/SL/Slippage macros |
+| `faq` | [[entities/faq-searcher]] | Keyword-based official FAQ/reference search + citation packs |
 | `lookup` | [[entities/price-lookup]] | Price inquiry + trailing stop sim + closest miss + gap explainer |
 | `funding` | [[entities/funding-macro-component]] | Funding rate macro |
 | `average` | [[entities/average-calculator]] | Position open/close average + per-position card + flip detection |
@@ -57,6 +58,7 @@ The brand subtitle next to the FD logo also adapts to the language:
 
 ## Recent updates
 
+- **2026-05-06** - `faq` tab added after `macros`, wired to `FaqSearcher`, lazy-mounted after first activation, and marked with a `"NEW"` badge. FD brand click now routes to the real `macros` tab id. See [[sources/sessions/2026-05-06-faq-searcher-deploy]].
 - **2026-05-05** — "NEW" badge added to the `balanceLog` tab label in `App.tsx` to surface the feature to first-time users. See [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]].
 - **2026-05-04** — `Lang` type extended to `'en' | 'tr' | 'zh'`. Third (CN) flag button added with inline-SVG China flag (red field, gold central star + 4 arc stars). Brand subtitle gained zh variant. See [[decisions/2026-05-04-add-zh-cn-trilingual]] and [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]].
 - **2026-05-03** — `balanceLog` tab added (Balance Log Analyzer absorbed into the host); see [[decisions/2026-05-03-merged-into-macro-generator-tab]].
@@ -67,10 +69,12 @@ The brand subtitle next to the FD logo also adapts to the language:
 - [[sources/sessions/2026-05-03-merge-into-macro-generator-and-redesign]] — `balanceLog` tab added
 - [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]] — `zh` language + CN flag
 - [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]] — "NEW" badge on Balance Log tab
+- [[sources/sessions/2026-05-06-faq-searcher-deploy]] - `faq` tab + FAQ Searcher panel
 
 ## Related
 
 - [[entities/app-context]] — Provider of hook `useApp`
+- [[entities/faq-searcher]]
 - [[entities/locales-ts]] — `uiStrings` translations (now en/tr/zh)
 - [[entities/live-ticker]] — embedded in header
 - [[concepts/bilingual-tr-en]] — now trilingual

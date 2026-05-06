@@ -385,3 +385,43 @@ Headline outcomes:
 - Balance Story drawer language picker now matches the visual quality of the main app's flag switcher. Uses `flagcdn.com/20x15/{code}.png` real flag images in both the trigger button and the option rows.
 - Closes via `onBlur` + 150 ms delay so `onMouseDown` on options fires before the blur collapses the list (avoids selection-race bug).
 - Styled entirely through `--bl-*` CSS tokens — consistent with the [[concepts/css-token-bridge]] pattern.
+
+---
+
+## [2026-05-06] ingest | faq-searcher-deploy
+
+Master session note:
+- `sources/sessions/2026-05-06-faq-searcher-deploy.md`
+
+New pages (2):
+- `sources/sessions/2026-05-06-faq-searcher-deploy.md`
+- `entities/faq-searcher.md`
+
+Updated pages (4):
+- `index.md` - added FAQ Searcher to the top-level product map, source sessions, and UI entities.
+- `entities/app-tsx.md` - updated tab count/mapping with the new `faq` tab, "NEW" badge, and FD brand reset fix.
+- `entities/analytics-system.md` - added `faq_search` and `faq_copy` events to the event catalog.
+- `entities/locales-ts.md` - added `tabFaq` EN/TR/ZH note.
+
+Files touched in code:
+- `src/App.tsx` - `faq` tab, lazy-mounted `FaqSearcher`, "NEW" badge, corrected brand click target.
+- `src/components/FaqSearcher.tsx` - keyword-first FAQ UI.
+- `src/faqCatalog.ts` - curated official reference catalog.
+- `src/faqSearch.ts` - normalization, alias expansion, ranking, citation-pack builder.
+- `src/faqSearch.test.ts` - Turkish liquidation, Chinese error-code, STP, and citation-pack tests.
+- `src/analytics/index.ts` - `faq` tab + FAQ copy/search events.
+- `src/locales.ts` - `tabFaq` in EN/TR/ZH.
+- `src/styles.css` - FAQ layout/result-card/search styles.
+- `outputs/PROJECT_PROGRESS_REPORT.md` - May 6 row updated with FAQ keyword search contribution.
+
+Verification and deploy:
+- `npm test` passed with 83 tests.
+- `npm run build` passed.
+- GitHub Pages deploy succeeded from `main`.
+- Generate Progress Report workflow succeeded.
+- Live bundle was verified to contain `FAQ Searcher`, `faq_search`, and the FAQ "NEW" badge.
+
+Headline outcomes:
+- Restored missing FAQ work from the older project copy into the current root project.
+- Removed extra FAQ filter/tab concepts and shipped the intended keyword-first support workflow.
+- Gives agents faster access to official references and citation-ready copy packs.

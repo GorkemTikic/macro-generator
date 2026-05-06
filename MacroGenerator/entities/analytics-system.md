@@ -61,6 +61,8 @@ Workbook export (src/analytics/exportWorkbook.ts)
 | `lookup_error` | lookup | `mode`, `symbol`, `error` |
 | `trailing_stop_checked` | lookup | `symbol`, `direction`, `market`, `status` |
 | `gap_explainer_checked` | lookup | `symbol`, `market`, `trigger_type`, `has_target`, `last_reached`, `mark_reached` - see [[decisions/2026-04-27-gap-explainer-checked-event]] |
+| `faq_search` | faq | `query`, `count` |
+| `faq_copy` | faq | `label`, `query` |
 | `funding_query` | funding | `symbol`, `side`, `interval`, `mode`, `lang` |
 | `funding_error` | funding | `symbol`, `error` |
 | `average_calc_run` | average | `trade_count` |
@@ -170,6 +172,7 @@ helper.
 - [[sources/sessions/2026-04-27-price-lookup-closest-miss-gap-explainer]]
 - [[sources/docs/2026-04-26-analytics-setup]]
 - [[sources/sessions/2026-05-03-full-codebase-audit-and-remediation]]
+- [[sources/sessions/2026-05-06-faq-searcher-deploy]]
 
 ## Related
 
@@ -183,6 +186,7 @@ helper.
 - [[decisions/2026-04-26-admin-export-endpoint]] - dedicated export route
 - [[decisions/2026-04-26-devices-not-users-framing]] - honest user-count labelling
 - [[entities/app-tsx]] - admin tab is conditionally rendered
+- [[entities/faq-searcher]]
 - [[bugs/2026-05-03-worker-open-binance-proxy-and-track-payload]]
 - [[bugs/2026-05-03-admin-dashboard-401-swallowed]]
 - [[decisions/2026-05-03-worker-path-allowlist]]
