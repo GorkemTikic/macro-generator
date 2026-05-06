@@ -34,6 +34,7 @@
 - [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]] - Price Lookup mode-tab emoji icons (Trigger 🎯, Range 📊, Last 1s ⏱️) + "NEW" badge on Balance Log tab
 - [[sources/sessions/2026-05-06-balance-story-flag-dropdown]] - Balance Story drawer: `<select>` → custom `LangSelect` component with `flagcdn.com` flag images; `LANGUAGE_OPTIONS` gained `flag` field
 - [[sources/sessions/2026-05-06-faq-searcher-deploy]] - FAQ Searcher restored from the older project copy, simplified to keyword search, deployed to GitHub Pages, and marked "NEW"
+- [[sources/sessions/2026-05-06-header-resource-links]] - Header links added for the How to Use guide and Video Guides collection
 
 ### Docs
 - [[sources/docs/2026-03-21-readme]] - README.md (Last Updated 2026-03-21)
@@ -51,7 +52,7 @@
 - [[entities/analytics-dashboard-guide]] - Leadership-facing PDF guide (HTML source + PDF render)
 
 ### Components (UI)
-- [[entities/app-tsx]] - Main layout, 6 tabs + lang switch with flags + token-gated Admin chip
+- [[entities/app-tsx]] - Main layout, 7 tabs + guide/video links + lang switch with flags + token-gated Admin chip
 - [[entities/macro-generator-component]] - TP/SL/Slippage macros
 - [[entities/funding-macro-component]] - Funding rate macro
 - [[entities/price-lookup]] - Price lookup (4 modes + trailing stop simulation)

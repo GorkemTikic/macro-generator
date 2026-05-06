@@ -18,6 +18,7 @@ chip in the header.
 - Token-gated Admin chip (visible only when `localStorage._fd_admin_token` is set)
 - Prop drill language state (`lang`: `'en' | 'tr' | 'zh'`) and `uiStrings` translations to children
 - Shows `LiveTicker` component in header (current price of the active symbol)
+- Shows external project resource links in the header: `How to Use` and `Video Guides`
 - `useApp()` reads the global `activeSymbol` context
 
 ## Tab → Component mapping
@@ -48,6 +49,20 @@ The brand subtitle next to the FD logo also adapts to the language:
 "Binance Futures support workspace" / "Binance Futures destek
 çalışma alanı" / "币安合约客服工作台".
 
+## Header resource links
+
+`App.tsx` renders a compact `resource-links` nav group between
+`LiveTicker` and the language switcher:
+
+| Label | Destination |
+|---|---|
+| `How to Use` | `https://boffice.toolsfdg.net/sh/x_rrcN3VYT-qsX_` |
+| `Video Guides` | `https://boffice.toolsfdg.net/sh/sVbnNVdxrWmgN9C` |
+
+Both links open in a new tab (`target="_blank"`, `rel="noreferrer"`).
+The styling lives in `src/styles.css` as `.resource-links` and
+`.resource-link`.
+
 ## Notes
 
 - Most tabs are always rendered (hidden by `display: none`) — state is preserved across tab switches; initial paint cost is moderately higher.
@@ -58,6 +73,7 @@ The brand subtitle next to the FD logo also adapts to the language:
 
 ## Recent updates
 
+- **2026-05-06** - Added top-header resource links for the How to Use guide and Video Guides collection so agents can open project guidance from the live app. See [[sources/sessions/2026-05-06-header-resource-links]].
 - **2026-05-06** - `faq` tab added after `macros`, wired to `FaqSearcher`, lazy-mounted after first activation, and marked with a `"NEW"` badge. FD brand click now routes to the real `macros` tab id. See [[sources/sessions/2026-05-06-faq-searcher-deploy]].
 - **2026-05-05** — "NEW" badge added to the `balanceLog` tab label in `App.tsx` to surface the feature to first-time users. See [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]].
 - **2026-05-04** — `Lang` type extended to `'en' | 'tr' | 'zh'`. Third (CN) flag button added with inline-SVG China flag (red field, gold central star + 4 arc stars). Brand subtitle gained zh variant. See [[decisions/2026-05-04-add-zh-cn-trilingual]] and [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]].
@@ -70,6 +86,7 @@ The brand subtitle next to the FD logo also adapts to the language:
 - [[sources/sessions/2026-05-04-zh-cn-trilingual-and-ux-polish]] — `zh` language + CN flag
 - [[sources/sessions/2026-05-05-ux-polish-icons-new-badge]] — "NEW" badge on Balance Log tab
 - [[sources/sessions/2026-05-06-faq-searcher-deploy]] - `faq` tab + FAQ Searcher panel
+- [[sources/sessions/2026-05-06-header-resource-links]] - header How to Use + Video Guides links
 
 ## Related
 

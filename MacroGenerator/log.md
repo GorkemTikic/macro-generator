@@ -425,3 +425,34 @@ Headline outcomes:
 - Restored missing FAQ work from the older project copy into the current root project.
 - Removed extra FAQ filter/tab concepts and shipped the intended keyword-first support workflow.
 - Gives agents faster access to official references and citation-ready copy packs.
+
+---
+
+## [2026-05-06] ingest | header-resource-links
+
+Master session note:
+- `sources/sessions/2026-05-06-header-resource-links.md`
+
+New pages (1):
+- `sources/sessions/2026-05-06-header-resource-links.md`
+
+Updated pages (3):
+- `index.md` - added the session entry and updated the `app-tsx` entity description from "6 tabs" to "7 tabs + guide/video links".
+- `entities/app-tsx.md` - documented the header `How to Use` and `Video Guides` links, destinations, and styling surface.
+- `log.md` - this entry.
+
+Files touched in code:
+- `src/App.tsx` - added `resource-links` nav with `How to Use` and `Video Guides` external anchors.
+- `src/styles.css` - added `.resource-links` and `.resource-link` chip styles.
+
+Verification and deploy:
+- `npm run build` passed.
+- Commit `72e33f1` - `feat: add guide links to header`.
+- GitHub Pages deploy succeeded from `main`.
+- Generate Progress Report workflow succeeded.
+- Live bundle was verified to contain both guide URLs and the `Video Guides` label.
+
+Headline outcomes:
+- Agents can open the written guide and video guide collection directly from the live app header.
+- Reduces onboarding friction and repeated "where is the guide?" routing.
+- Keeps resource access visible without adding more tabs to the main workspace.
