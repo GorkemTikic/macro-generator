@@ -259,6 +259,37 @@ body {
   justify-content: flex-end;
 }
 
+.resource-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.resource-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-pill);
+  color: var(--text-2);
+  background: var(--bg-3);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--dur-2), border-color var(--dur-2), background var(--dur-2);
+}
+
+.resource-link:hover {
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
 /* Source disclaimer pill */
 .badge {
   display: inline-flex;

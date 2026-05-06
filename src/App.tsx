@@ -88,6 +88,24 @@ export default function App() {
           </div>
           <div className="appbar-right">
             <LiveTicker />
+            <nav className="resource-links" aria-label="Project resources">
+              <a
+                className="resource-link"
+                href="https://boffice.toolsfdg.net/sh/x_rrcN3VYT-qsX_"
+                target="_blank"
+                rel="noreferrer"
+              >
+                How to Use
+              </a>
+              <a
+                className="resource-link"
+                href="https://boffice.toolsfdg.net/sh/sVbnNVdxrWmgN9C"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Video Guides
+              </a>
+            </nav>
             <div className="lang-switcher" role="group" aria-label="Language">
               <button
                 className={`lang-btn ${lang === 'en' ? 'active' : ''}`}
